@@ -3,6 +3,12 @@
 AuxBrain helps researchers ask fine-grained questions about Markdown and PDF papers,
 inspect supporting evidence, and build a local human-reviewed knowledge graph.
 
+> [!IMPORTANT]
+> AuxBrain is currently distributed as a public beta through GitHub and BRAT. It is
+> not published in the official Obsidian Community directory. The companion service
+> is not included in this repository or its releases, so this beta is intended for
+> testers who already have access to an AuxBrain backend environment.
+
 ## Requirements
 
 - Obsidian Desktop 1.5.0 or later.
@@ -13,12 +19,14 @@ The current release supports the official DeepSeek API and Volcengine Coding Pla
 Support for additional LLM services is planned. API keys are sent only to the local
 loopback service and are not stored in the Obsidian plugin data file.
 
-## Installation
+## Beta installation
 
-### Community plugins
+### BRAT
 
-After AuxBrain is accepted into the Obsidian community directory, install and enable it
-from **Settings -> Community plugins**.
+1. Install and enable BRAT from Obsidian's Community plugins browser.
+2. Open **Settings -> BRAT -> Add beta plugin**.
+3. Enter `https://github.com/asjmasjm/auxbrain`.
+4. Choose the latest release, install it, and enable AuxBrain.
 
 ### Manual installation
 
@@ -32,7 +40,8 @@ Restart Obsidian or disable and re-enable AuxBrain after replacing the files.
 
 ## Local service
 
-Start the companion service from the AuxBrain backend directory:
+Existing AuxBrain backend testers can start the companion service from their backend
+directory:
 
 ```powershell
 conda activate fkms
@@ -49,6 +58,18 @@ database is stored at:
 The database and schema are created automatically on first launch. Each user keeps a
 separate local knowledge base containing papers, entities, reviewed relations, rejected
 suggestions, question history, and model provenance.
+
+## Privacy and network access
+
+- The plugin connects to the configured companion-service URL, which defaults to the
+  local loopback address `http://127.0.0.1:8795`.
+- Questions, selected passages, document text needed for evidence retrieval, provider
+  settings, and API credentials are sent to that companion service for processing.
+- In LLM modes, the companion service sends the required prompt context to the selected
+  DeepSeek or Volcengine service and uses the supplied API key to authenticate there.
+- The companion service creates and accesses the personal SQLite knowledge base outside
+  the Obsidian vault so knowledge can remain local to the user's computer.
+- AuxBrain does not include client-side telemetry or advertising.
 
 ## Usage
 
