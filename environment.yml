@@ -1,0 +1,6 @@
+name: obsidian
+channels:
+  - conda-forge
+dependencies:
+  - git
+  - nodejs

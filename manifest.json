@@ -1,0 +1,9 @@
+{
+  "id": "auxbrain",
+  "name": "AuxBrain",
+  "version": "0.8.1",
+  "minAppVersion": "1.5.0",
+  "description": "AuxBrain research understanding and human-in-the-loop annotation for Obsidian.",
+  "author": "zzx",
+  "isDesktopOnly": true
+}

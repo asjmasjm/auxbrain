@@ -1,0 +1,26 @@
+{
+  "name": "auxbrain",
+  "version": "0.8.1",
+  "description": "AuxBrain research understanding and human-in-the-loop annotation for Obsidian.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "validate:release": "npm run build && node scripts/validate-release.mjs"
+  },
+  "keywords": [
+    "obsidian",
+    "plugin",
+    "auxbrain"
+  ],
+  "author": "zzx",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "builtin-modules": "^5.0.0",
+    "esbuild": "^0.25.0",
+    "obsidian": "^1.8.7",
+    "tslib": "^2.8.1",
+    "typescript": "^5.8.0"
+  }
+}
