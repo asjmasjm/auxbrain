@@ -27,8 +27,8 @@ loopback service and are not stored in the Obsidian plugin data file.
 1. Install and enable BRAT from Obsidian's Community plugins browser.
 2. Open **Settings -> BRAT -> Add beta plugin**.
 3. Enter `https://github.com/asjmasjm/auxbrain`.
-4. Choose `0.8.2 (Prerelease)`, install it, and enable AuxBrain. BRAT's `Latest`
-   option ignores GitHub prereleases and may select 0.8.1 instead.
+4. Choose `Latest` (currently 0.8.3), or select 0.8.3 explicitly, then install
+   and enable AuxBrain.
 5. Download `AuxBrain-Companion-0.8.2-win-x64.zip` from the same release.
 6. Verify its SHA-256, extract the ZIP, and run `AuxBrain-Companion.exe`.
 

@@ -18,6 +18,12 @@ if (versions[manifest.version] !== manifest.minAppVersion) {
 if (!manifest.id || manifest.id.toLowerCase().includes("obsidian")) {
   errors.push("manifest id must be present and must not contain 'obsidian'");
 }
+if (/\bobsidian\b/i.test(manifest.description)) {
+  errors.push("manifest description must not include 'Obsidian'");
+}
+if (manifest.description.toLowerCase().startsWith(manifest.name.toLowerCase())) {
+  errors.push("manifest description must not start with the plugin name");
+}
 if (manifest.isDesktopOnly !== true) {
   errors.push("AuxBrain requires its desktop companion service");
 }

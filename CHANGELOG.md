@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.3
+
+- Make the plugin description comply with the Obsidian directory guidelines.
+- Keep compatibility with AuxBrain Companion 0.8.2 and API protocol 1.
+
 ## 0.8.2
 
 - Add a separately distributed, closed-source Windows x64 Companion containing the latest AuxBrain algorithms.
