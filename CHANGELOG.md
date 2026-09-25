@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.2
+
+- Add a separately distributed, closed-source Windows x64 Companion containing the latest AuxBrain algorithms.
+- Add Companion service identity and API protocol compatibility checks.
+- Link to the matching Companion release when the local service is unavailable.
+- Document the unsigned Beta and Microsoft Defender SmartScreen warning.
+- Keep first-run database creation local to each Windows user.
+
 ## 0.8.1
 
 - Prevent answering and knowledge-base writes from running at the same time in the UI.

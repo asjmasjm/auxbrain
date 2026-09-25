@@ -104,6 +104,9 @@ export interface ReviewResult {
 }
 
 export interface BridgeConfig {
+  service: string;
+  service_version: string;
+  api_protocol_version: number;
   profile: string;
   db_path: string;
   metadata: Record<string, string>;

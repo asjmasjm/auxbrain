@@ -15,6 +15,10 @@ import {
   UnderstandingResult
 } from "./contracts";
 
+const EXPECTED_COMPANION_SERVICE = "auxbrain-companion";
+const EXPECTED_API_PROTOCOL_VERSION = 1;
+const MINIMUM_COMPANION_VERSION = "0.8.2";
+
 export class AuxBrainClient {
   private readonly baseUrl: string;
 
@@ -142,7 +146,9 @@ export class AuxBrainClient {
   }
 
   async configuration(): Promise<BridgeConfig> {
-    return this.get<BridgeConfig>("/api/v1/config");
+    const config = await this.get<BridgeConfig>("/api/v1/config");
+    this.assertCompatibleCompanion(config);
+    return config;
   }
 
   async personalKnowledge(limit = 200): Promise<PersonalKnowledgeSnapshot> {
@@ -201,6 +207,20 @@ export class AuxBrainClient {
       throw new Error(error?.error || text || `AuxBrain 服务返回 ${status}`);
     }
     return body as T;
+  }
+
+  private assertCompatibleCompanion(config: BridgeConfig): void {
+    if (
+      config.service !== EXPECTED_COMPANION_SERVICE ||
+      typeof config.service_version !== "string"
+    ) {
+      throw new Error(`本地服务版本过旧，请下载并启动 Companion ${MINIMUM_COMPANION_VERSION}`);
+    }
+    if (config.api_protocol_version !== EXPECTED_API_PROTOCOL_VERSION) {
+      throw new Error(
+        `Companion API 不兼容：需要协议 ${EXPECTED_API_PROTOCOL_VERSION}，当前为 ${String(config.api_protocol_version)}`
+      );
+    }
   }
 }
 

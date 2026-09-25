@@ -5,14 +5,15 @@ inspect supporting evidence, and build a local human-reviewed knowledge graph.
 
 > [!IMPORTANT]
 > AuxBrain is currently distributed as a public beta through GitHub and BRAT. It is
-> not published in the official Obsidian Community directory. The companion service
-> is not included in this repository or its releases, so this beta is intended for
-> testers who already have access to an AuxBrain backend environment.
+> not published in the official Obsidian Community directory. Version 0.8.2 adds a
+> separately distributed Windows x64 Companion to the GitHub release. The Companion
+> contains proprietary AuxBrain algorithms and is not open source.
 
 ## Requirements
 
 - Obsidian Desktop 1.5.0 or later.
-- The AuxBrain local companion service running on the same computer.
+- Windows 10 or 11 x64.
+- AuxBrain Companion 0.8.2 running on the same computer.
 - A DeepSeek API key or Volcengine Coding Plan API key.
 
 The current release supports the official DeepSeek API and Volcengine Coding Plan.
@@ -27,6 +28,8 @@ loopback service and are not stored in the Obsidian plugin data file.
 2. Open **Settings -> BRAT -> Add beta plugin**.
 3. Enter `https://github.com/asjmasjm/auxbrain`.
 4. Choose the latest release, install it, and enable AuxBrain.
+5. Download `AuxBrain-Companion-0.8.2-win-x64.zip` from the same release.
+6. Verify its SHA-256, extract the ZIP, and run `AuxBrain-Companion.exe`.
 
 ### Manual installation
 
@@ -38,24 +41,30 @@ Copy these release assets into `<vault>/.obsidian/plugins/auxbrain/`:
 
 Restart Obsidian or disable and re-enable AuxBrain after replacing the files.
 
+Then download the matching Companion ZIP from the
+[0.8.2 Beta release](https://github.com/asjmasjm/auxbrain/releases/tag/0.8.2),
+verify its SHA-256, extract it, and run `AuxBrain-Companion.exe`.
+
 ## Local service
 
-Existing AuxBrain backend testers can start the companion service from their backend
-directory:
+The portable Companion does not require Python or Conda. Keep its console window open
+while using the plugin; close the window or press `Ctrl+C` to stop it. The default
+endpoint is `http://127.0.0.1:8795`, and the service refuses non-loopback bind
+addresses.
 
-```powershell
-conda activate fkms
-python fkms_obsidian_bridge.py
-```
+> [!WARNING]
+> Companion 0.8.2 Beta is not code-signed. Microsoft Defender SmartScreen may warn
+> before first launch. Download it only from the official AuxBrain GitHub release and
+> compare its SHA-256 with `SHA256SUMS.txt`. Do not disable SmartScreen or antivirus
+> globally. Proceed only when the source and hash match.
 
-The default endpoint is `http://127.0.0.1:8795`. On Windows, the default personal
-database is stored at:
+On Windows, the default personal database is stored at:
 
 ```text
 %LOCALAPPDATA%\AuxBrain\profiles\default\auxbrain.sqlite
 ```
 
-The database and schema are created automatically on first launch. Each user keeps a
+The database and schema are created or upgraded automatically on launch. Each user keeps a
 separate local knowledge base containing papers, entities, reviewed relations, rejected
 suggestions, question history, and model provenance.
 
@@ -120,9 +129,13 @@ version mapping, plugin ID, desktop requirement, and release assets.
 4. Create and push a tag matching `manifest.json` exactly, without a `v` prefix.
 5. The GitHub Actions workflow creates a draft release containing `main.js`,
    `manifest.json`, and `styles.css`.
-6. Review the notes and publish the GitHub release before submitting the repository to
-   the Obsidian community directory.
+6. Build and validate the proprietary Companion outside this public repository, then
+   upload its ZIP and `SHA256SUMS.txt` to the draft release.
+7. Review the notes and publish the GitHub release. This Beta is currently distributed
+   through GitHub and BRAT, not the official Obsidian Community directory.
 
-## License
+## Licenses
 
-MIT
+The Obsidian plugin source in this repository is licensed under the MIT License. The
+separately downloaded AuxBrain Companion is proprietary and includes its own binary
+notice and third-party runtime licenses in the ZIP.

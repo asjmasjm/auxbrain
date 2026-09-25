@@ -1626,6 +1626,7 @@ export class AuxBrainView extends ItemView {
   private renderRuntimeControls(container: HTMLElement): void {
     const panel = container.createDiv({ cls: "fkms-runtime-panel" });
     if (!this.bridgeConfig) {
+      if (this.configurationError) panel.addClass("is-disconnected");
       const status = panel.createDiv({ cls: "fkms-runtime-loading" });
       status.createSpan({ cls: "fkms-status-dot" });
       status.createSpan({
@@ -1633,7 +1634,7 @@ export class AuxBrainView extends ItemView {
       });
       if (this.configurationError) {
         status.dataset.state = "error";
-        const retry = panel.createEl("button", {
+        const retry = status.createEl("button", {
           cls: "clickable-icon fkms-runtime-icon",
           attr: {
             type: "button",
@@ -1643,6 +1644,22 @@ export class AuxBrainView extends ItemView {
         });
         setIcon(retry, "refresh-cw");
         retry.onclick = () => void this.reloadConfiguration();
+
+        const download = panel.createEl("a", {
+          cls: "fkms-companion-download",
+          attr: {
+            href: "https://github.com/asjmasjm/auxbrain/releases/tag/0.8.2",
+            target: "_blank",
+            rel: "noopener"
+          }
+        });
+        const downloadIcon = download.createSpan({ cls: "fkms-button-icon" });
+        setIcon(downloadIcon, "download");
+        download.createSpan({ text: "下载 Companion 0.8.2" });
+        panel.createDiv({
+          cls: "fkms-companion-warning",
+          text: "未签名 Beta 可能触发 Windows SmartScreen。请仅从官方 Release 下载并核对 SHA-256。"
+        });
       } else if (!this.configurationLoading && !this.configurationAttempted) {
         void this.reloadConfiguration();
       }

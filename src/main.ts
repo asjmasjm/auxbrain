@@ -471,7 +471,7 @@ class AuxBrainSettingTab extends PluginSettingTab {
         .map((provider) => `${provider.name}：${provider.configured ? "已配置" : "未配置"}`)
         .join("\n");
       element.setText(
-        `本地数据库：${config.db_path}\n${providers}\n实体：${config.stats.entities ?? 0}，已确认关系：${config.stats.assertions ?? 0}`
+        `Companion：${config.service_version}（API ${config.api_protocol_version}）\n本地数据库：${config.db_path}\n${providers}\n实体：${config.stats.entities ?? 0}，已确认关系：${config.stats.assertions ?? 0}`
       );
     } catch (error) {
       element.setText(`无法连接本地服务：${this.errorMessage(error)}`);
