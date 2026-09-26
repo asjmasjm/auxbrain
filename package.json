@@ -1,6 +1,6 @@
 {
   "name": "auxbrain",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "description": "Ask fine-grained questions about papers, inspect supporting evidence, and build a personal reviewed knowledge graph.",
   "main": "main.js",
   "scripts": {

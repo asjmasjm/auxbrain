@@ -5,7 +5,7 @@ inspect supporting evidence, and build a local human-reviewed knowledge graph.
 
 > [!IMPORTANT]
 > AuxBrain is currently distributed as a public beta through GitHub and BRAT. It is
-> not published in the official Obsidian Community directory. Version 0.8.2 adds a
+> not published in the official Obsidian Community directory. Version 0.8.4 includes a
 > separately distributed Windows x64 Companion to the GitHub release. The Companion
 > contains proprietary AuxBrain algorithms and is not open source.
 
@@ -13,7 +13,7 @@ inspect supporting evidence, and build a local human-reviewed knowledge graph.
 
 - Obsidian Desktop 1.5.0 or later.
 - Windows 10 or 11 x64.
-- AuxBrain Companion 0.8.2 running on the same computer.
+- AuxBrain Companion 0.8.4 running on the same computer.
 - A DeepSeek API key or Volcengine Coding Plan API key.
 
 The current release supports the official DeepSeek API and Volcengine Coding Plan.
@@ -27,9 +27,9 @@ loopback service and are not stored in the Obsidian plugin data file.
 1. Install and enable BRAT from Obsidian's Community plugins browser.
 2. Open **Settings -> BRAT -> Add beta plugin**.
 3. Enter `https://github.com/asjmasjm/auxbrain`.
-4. Choose `Latest` (currently 0.8.3), or select 0.8.3 explicitly, then install
+4. Choose `Latest` (currently 0.8.4), or select 0.8.4 explicitly, then install
    and enable AuxBrain.
-5. Download `AuxBrain-Companion-0.8.2-win-x64.zip` from the same release.
+5. Download [AuxBrain-Companion-0.8.4-win-x64.zip](https://github.com/asjmasjm/auxbrain/releases/download/0.8.4/AuxBrain-Companion-0.8.4-win-x64.zip).
 6. Verify its SHA-256, extract the ZIP, and run `AuxBrain-Companion.exe`.
 
 ### Manual installation
@@ -43,8 +43,20 @@ Copy these release assets into `<vault>/.obsidian/plugins/auxbrain/`:
 Restart Obsidian or disable and re-enable AuxBrain after replacing the files.
 
 Then download the matching Companion ZIP from the
-[0.8.2 Beta release](https://github.com/asjmasjm/auxbrain/releases/tag/0.8.2),
+[0.8.4 Beta release](https://github.com/asjmasjm/auxbrain/releases/tag/0.8.4),
 verify its SHA-256, extract it, and run `AuxBrain-Companion.exe`.
+
+### Upgrade from 0.8.2 or 0.8.3
+
+Update the plugin to 0.8.4 through BRAT or replace the three plugin files above.
+Stop the old Companion, extract the new 0.8.4 ZIP, and start its executable.
+Keep using the same profile or `--db` path: existing personal data is retained and
+the database schema is upgraded automatically. BRAT updates only the plugin;
+the Companion must be updated separately.
+
+`build-info.json` in the ZIP records the build time, backend source revision,
+whether local changes were included, a source fingerprint, and the executable hash.
+Companion 0.8.4 is a new build, not a renamed copy of Companion 0.8.2.
 
 ## Local service
 
@@ -54,7 +66,7 @@ endpoint is `http://127.0.0.1:8795`, and the service refuses non-loopback bind
 addresses.
 
 > [!WARNING]
-> Companion 0.8.2 Beta is not code-signed. Microsoft Defender SmartScreen may warn
+> Companion 0.8.4 Beta is not code-signed. Microsoft Defender SmartScreen may warn
 > before first launch. Download it only from the official AuxBrain GitHub release and
 > compare its SHA-256 with `SHA256SUMS.txt`. Do not disable SmartScreen or antivirus
 > globally. Proceed only when the source and hash match.

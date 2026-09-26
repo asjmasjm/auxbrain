@@ -1648,14 +1648,14 @@ export class AuxBrainView extends ItemView {
         const download = panel.createEl("a", {
           cls: "fkms-companion-download",
           attr: {
-            href: "https://github.com/asjmasjm/auxbrain/releases/tag/0.8.2",
+            href: "https://github.com/asjmasjm/auxbrain/releases/tag/0.8.4",
             target: "_blank",
             rel: "noopener"
           }
         });
         const downloadIcon = download.createSpan({ cls: "fkms-button-icon" });
         setIcon(downloadIcon, "download");
-        download.createSpan({ text: "下载 Companion 0.8.2" });
+        download.createSpan({ text: "下载 Companion 0.8.4" });
         panel.createDiv({
           cls: "fkms-companion-warning",
           text: "未签名 Beta 可能触发 Windows SmartScreen。请仅从官方 Release 下载并核对 SHA-256。"

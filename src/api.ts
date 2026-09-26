@@ -17,7 +17,7 @@ import {
 
 const EXPECTED_COMPANION_SERVICE = "auxbrain-companion";
 const EXPECTED_API_PROTOCOL_VERSION = 1;
-const MINIMUM_COMPANION_VERSION = "0.8.2";
+const MINIMUM_COMPANION_VERSION = "0.8.4";
 
 export class AuxBrainClient {
   private readonly baseUrl: string;

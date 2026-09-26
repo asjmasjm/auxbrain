@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.4
+
+- Rebuild the Windows Companion from the current backend source, including Ark thinking-mode forwarding and current algorithm dependencies.
+- Require Companion 0.8.4 and update the in-app download link and installation instructions.
+- Include build provenance and checksums with the Companion; retain API protocol 1 and local database upgrades.
+
 ## 0.8.3
 
 - Make the plugin description comply with the Obsidian directory guidelines.
