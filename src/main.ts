@@ -1,12 +1,15 @@
 import {
   App,
   Editor,
+  FileView,
   MarkdownView,
   Menu,
+  Modal,
   Notice,
   Plugin,
   PluginSettingTab,
   Setting,
+  TFile,
   WorkspaceLeaf
 } from "obsidian";
 import { AuxBrainClient } from "./api";
@@ -29,7 +32,7 @@ import { friendlyError } from "./errors";
 import { LlmConfigurationModal } from "./llm-config-modal";
 import { RuntimeConfigurationModal } from "./runtime-config-modal";
 import { AuxBrainView, AuxBrainViewHost, VIEW_TYPE_AUXBRAIN } from "./view";
-import { readActiveDocument } from "./document-reader";
+import { readDocument } from "./document-reader";
 import { navigateToEvidence } from "./evidence-navigation";
 
 const DEFAULT_SETTINGS: AuxBrainSettings = {
@@ -44,6 +47,13 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
   settings: AuxBrainSettings = DEFAULT_SETTINGS;
   private lastSelectedText = "";
   private analysisInFlight = false;
+  private activeDocument: TFile | null = null;
+  private documentRequestId = 0;
+  private documentRead: AbortController | null = null;
+  private setupPrompted = false;
+  private configurationModal: Modal | null = null;
+  private configurationOpening = false;
+  private unloaded = false;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -52,6 +62,19 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
       (leaf) => new AuxBrainView(leaf, this)
     );
     this.addSettingTab(new AuxBrainSettingTab(this.app, this));
+    this.registerEvent(this.app.workspace.on("file-open", (file) => {
+      if (file) this.trackDocument(file);
+    }));
+    this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => {
+      if (leaf?.view instanceof FileView && leaf.view.file) {
+        this.trackDocument(leaf.view.file);
+      }
+    }));
+    this.app.workspace.onLayoutReady(() => {
+      if (this.unloaded) return;
+      const file = this.app.workspace.getActiveFile();
+      if (file) this.trackDocument(file);
+    });
 
     this.addRibbonIcon("brain-circuit", "打开 AuxBrain", async () => {
       await this.openCurrentDocumentQuestion();
@@ -136,6 +159,9 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
   }
 
   async onunload(): Promise<void> {
+    this.unloaded = true;
+    this.cancelDocumentRead();
+    this.configurationModal?.close();
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_AUXBRAIN);
   }
 
@@ -222,10 +248,65 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
       new Notice(currentView.workflowBusyMessage());
       return;
     }
-    const draft = await readActiveDocument(this.app);
-    const leaf = await this.activateView();
-    if (leaf.view instanceof AuxBrainView) {
-      leaf.view.setUnderstandingDraft(draft);
+    const file = this.app.workspace.getActiveFile() ?? this.activeDocument;
+    if (!file) throw new Error("请先打开一篇 Markdown 或 PDF 文档");
+    this.activeDocument = file;
+    await this.activateView();
+    await this.syncDocument(true);
+  }
+
+  onViewOpened(): void {
+    this.activeDocument = this.app.workspace.getActiveFile() ?? this.activeDocument;
+    void this.syncDocument();
+  }
+
+  onWorkflowIdle(): void {
+    void this.syncDocument();
+  }
+
+  private trackDocument(file: TFile): void {
+    if (this.unloaded) return;
+    if (file.path !== this.activeDocument?.path) this.lastSelectedText = "";
+    this.activeDocument = file;
+    void this.syncDocument();
+  }
+
+  private cancelDocumentRead(): void {
+    this.documentRequestId += 1;
+    this.documentRead?.abort();
+    this.documentRead = null;
+  }
+
+  private async syncDocument(force = false): Promise<void> {
+    const view = this.currentAuxBrainView();
+    const file = this.activeDocument;
+    if (this.unloaded || !view || !file) return;
+    if (view.isWorkflowBusy()) {
+      view.setPendingDocument(view.documentPath === file.path ? "" : file.basename);
+      return;
+    }
+    if (!force && view.documentPath === file.path) {
+      view.setPendingDocument("");
+      return;
+    }
+    this.cancelDocumentRead();
+    const requestId = this.documentRequestId;
+    const controller = new AbortController();
+    this.documentRead = controller;
+    view.beginDocumentLoad({
+      text: "", sourcePath: file.path, title: file.basename,
+      sourceType: file.extension.toLowerCase() === "pdf" ? "pdf" : "markdown"
+    });
+    const isCurrent = (): boolean => !this.unloaded
+      && requestId === this.documentRequestId
+      && this.currentAuxBrainView() === view;
+    try {
+      const draft = await readDocument(this.app, file, controller.signal);
+      if (isCurrent()) view.setUnderstandingDraft(draft);
+    } catch (error) {
+      if (isCurrent()) view.setDocumentError(friendlyError(error));
+    } finally {
+      if (requestId === this.documentRequestId) this.documentRead = null;
     }
   }
 
@@ -249,19 +330,43 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
     onSaved?: () => void,
     onBack?: () => void
   ): void {
-    new LlmConfigurationModal(this.app, this, provider, onSaved, onBack).open();
+    if (this.unloaded || this.configurationModal) return;
+    const modal = new LlmConfigurationModal(
+      this.app, this, provider, onSaved,
+      onBack ?? (() => void this.openRuntimeConfiguration(undefined, onSaved)),
+      () => { if (this.configurationModal === modal) this.configurationModal = null; }
+    );
+    this.configurationModal = modal;
+    modal.open();
   }
 
   async openRuntimeConfiguration(
     config?: BridgeConfig,
-    onSaved?: () => void
+    onSaved?: () => void,
+    firstUse = false
   ): Promise<void> {
+    if (this.unloaded || this.configurationModal || this.configurationOpening) return;
+    this.configurationOpening = true;
     try {
       const latest = config ?? await this.client().configuration();
-      new RuntimeConfigurationModal(this.app, this, latest, onSaved).open();
+      if (this.unloaded || this.configurationModal) return;
+      const modal = new RuntimeConfigurationModal(this.app, this, latest, onSaved, firstUse,
+        () => { if (this.configurationModal === modal) this.configurationModal = null; }
+      );
+      this.configurationModal = modal;
+      modal.open();
     } catch (error) {
       new Notice(`无法读取回答模式：${friendlyError(error)}`);
+    } finally {
+      this.configurationOpening = false;
     }
+  }
+
+  promptLlmSetup(config: BridgeConfig, onSaved: () => void): void {
+    if (this.setupPrompted || this.configurationModal || this.configurationOpening
+      || findLlmProvider(config, this.settings.llmProvider)?.configured) return;
+    this.setupPrompted = true;
+    void this.openRuntimeConfiguration(config, onSaved, true);
   }
 
   async ensureLlmCredential(onSaved?: () => void): Promise<boolean> {
@@ -269,7 +374,7 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
       const config = await this.client().configuration();
       const provider = findLlmProvider(config, this.settings.llmProvider);
       if (provider?.configured) return true;
-      this.openLlmConfiguration(this.settings.llmProvider, onSaved);
+      await this.openRuntimeConfiguration(config, onSaved, true);
       return false;
     } catch (error) {
       new Notice(`无法读取 LLM 配置：${friendlyError(error)}`);
@@ -363,6 +468,7 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
     }
     const leaf = await this.activateView();
     if (leaf.view instanceof AuxBrainView) {
+      this.cancelDocumentRead();
       leaf.view.setAnnotationDraft(draft);
     }
   }

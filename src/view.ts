@@ -82,6 +82,9 @@ export interface AuxBrainViewHost {
     evidence: UnderstandingEvidence[]
   ): Promise<void>;
   loadActiveDocument(): Promise<void>;
+  onViewOpened(): void;
+  onWorkflowIdle(): void;
+  promptLlmSetup(config: BridgeConfig, onSaved: () => void): void;
   navigateToEvidence(
     draft: DraftSelection,
     evidence: UnderstandingEvidence
@@ -141,6 +144,10 @@ export class AuxBrainView extends ItemView {
   private configurationLoading = false;
   private configurationAttempted = false;
   private configurationError = "";
+  private documentLoading = false;
+  private documentError = "";
+  private pendingDocumentTitle = "";
+  private closed = false;
 
   constructor(leaf: WorkspaceLeaf, host: AuxBrainViewHost) {
     super(leaf);
@@ -156,6 +163,37 @@ export class AuxBrainView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
+    this.closed = false;
+    this.render();
+    this.host.onViewOpened();
+  }
+
+  async onClose(): Promise<void> {
+    this.closed = true;
+    this.questionHistoryRequestId += 1;
+    for (const observer of this.knowledgeGraphObservers) observer.disconnect();
+    this.knowledgeGraphObservers = [];
+  }
+
+  get documentPath(): string | null {
+    return this.draft?.sourcePath ?? null;
+  }
+
+  setPendingDocument(title: string): void {
+    if (this.pendingDocumentTitle === title) return;
+    this.pendingDocumentTitle = title;
+    this.render();
+  }
+
+  beginDocumentLoad(draft: DraftSelection): void {
+    this.resetDraft(draft);
+    this.documentLoading = true;
+    this.render();
+  }
+
+  setDocumentError(message: string): void {
+    this.documentLoading = false;
+    this.documentError = message;
     this.render();
   }
 
@@ -178,14 +216,27 @@ export class AuxBrainView extends ItemView {
       new Notice(this.workflowBusyMessage());
       return;
     }
+    this.resetDraft(draft);
+    this.render();
+    void this.loadQuestionHistory(draft);
+  }
+
+  private resetDraft(draft: DraftSelection): void {
     this.draft = draft;
+    this.documentLoading = false;
+    this.documentError = "";
+    this.pendingDocumentTitle = "";
     this.analysis = null;
     this.understanding = null;
     this.understandingJob = null;
     this.correctionEvidence = null;
+    this.questionHistoryRequestId += 1;
     this.questionHistory = null;
     this.questionHistoryLoading = false;
     this.intent = "understand";
+    this.interpretation = "";
+    this.analyzedInterpretation = "";
+    this.interpretationBusy = false;
     this.feedbackBusy = false;
     this.knowledgeWriteJob = null;
     this.contributionBusy = false;
@@ -198,8 +249,6 @@ export class AuxBrainView extends ItemView {
     this.evidenceDisplayCount = DEFAULT_EVIDENCE_COUNT;
     this.showKnowledgeBase = false;
     this.selectedKnowledgeNodeId = null;
-    this.render();
-    void this.loadQuestionHistory(draft);
   }
 
   setAnnotationDraft(draft: DraftSelection): void {
@@ -207,26 +256,13 @@ export class AuxBrainView extends ItemView {
       new Notice(this.workflowBusyMessage());
       return;
     }
-    this.draft = draft;
-    this.analysis = null;
-    this.understanding = null;
-    this.understandingJob = null;
-    this.correctionEvidence = null;
-    this.questionHistoryRequestId += 1;
-    this.questionHistory = null;
-    this.questionHistoryLoading = false;
+    this.resetDraft(draft);
     this.intent = "annotate";
-    this.interpretation = "";
-    this.analyzedInterpretation = "";
-    this.interpretationBusy = false;
-    this.reviewBusy = false;
-    this.reviewCompleted = false;
-    this.showKnowledgeBase = false;
-    this.selectedKnowledgeNodeId = null;
     this.render();
   }
 
   private render(): void {
+    if (this.closed) return;
     for (const observer of this.knowledgeGraphObservers) observer.disconnect();
     this.knowledgeGraphObservers = [];
     const container = this.containerEl.children[1] as HTMLElement;
@@ -264,6 +300,36 @@ export class AuxBrainView extends ItemView {
         new Notice(`无法读取当前文档：${friendlyError(error)}`);
       }
     };
+    if (!this.bridgeConfig) {
+      this.renderRuntimeControls(container);
+    } else if (!findLlmProvider(this.bridgeConfig, this.host.getSettings().llmProvider)?.configured) {
+      const setup = container.createDiv({ cls: "fkms-setup-status", attr: { role: "status" } });
+      setup.createSpan({ text: "尚未配置 LLM" });
+      const button = setup.createEl("button", { attr: { type: "button" } });
+      setIcon(button.createSpan({ cls: "fkms-button-icon" }), "settings-2");
+      button.createSpan({ text: "设置 LLM" });
+      button.disabled = this.isWorkflowBusy();
+      button.onclick = () => this.host.openRuntimeConfiguration(
+        this.bridgeConfig!, () => void this.reloadConfiguration()
+      );
+    }
+    if (this.pendingDocumentTitle) {
+      container.createDiv({
+        cls: "fkms-document-status", attr: { role: "status" },
+        text: `当前任务完成后切换到《${this.pendingDocumentTitle}》`
+      });
+    }
+    if (this.documentLoading || this.documentError) {
+      this.renderDocumentBanner(container);
+      const status = container.createDiv({
+        cls: "fkms-document-status", attr: { role: "status", "aria-live": "polite" }
+      });
+      if (this.documentLoading) {
+        setIcon(status.createSpan({ cls: "fkms-document-spinner" }), "loader-circle");
+      }
+      status.createSpan({ text: this.documentError || "正在读取论文…" });
+      return;
+    }
     if (this.showKnowledgeBase) {
       this.renderBackNavigation(container, () => {
         this.showKnowledgeBase = false;
@@ -275,7 +341,7 @@ export class AuxBrainView extends ItemView {
     }
     if (!this.draft) {
       container.createEl("p", {
-        text: "打开一篇 Markdown 或 PDF，然后点击上方刷新按钮载入当前文档并直接提问。"
+        text: "尚未打开论文"
       });
       const actions = container.createDiv({ cls: "fkms-primary-actions" });
       const load = actions.createEl("button", {
@@ -520,6 +586,7 @@ export class AuxBrainView extends ItemView {
     } finally {
       this.interpretationBusy = false;
       this.render();
+      this.host.onWorkflowIdle();
     }
   }
 
@@ -560,6 +627,7 @@ export class AuxBrainView extends ItemView {
     } finally {
       this.reviewBusy = false;
       this.render();
+      this.host.onWorkflowIdle();
     }
   }
 
@@ -813,7 +881,7 @@ export class AuxBrainView extends ItemView {
   }
 
   private async runUnderstanding(): Promise<void> {
-    if (!this.draft || this.understandingBusy) return;
+    if (!this.draft || this.documentLoading || this.documentError || this.understandingBusy) return;
     if (this.feedbackBusy || this.reviewBusy) {
       new Notice("知识库正在写入，完成后再提问");
       return;
@@ -849,6 +917,7 @@ export class AuxBrainView extends ItemView {
     } finally {
       this.understandingBusy = false;
       this.render();
+      this.host.onWorkflowIdle();
     }
   }
 
@@ -1149,6 +1218,7 @@ export class AuxBrainView extends ItemView {
     } finally {
       this.feedbackBusy = false;
       this.render();
+      this.host.onWorkflowIdle();
     }
   }
 
@@ -1734,6 +1804,7 @@ export class AuxBrainView extends ItemView {
     this.configurationError = "";
     try {
       const config = await this.host.client().configuration();
+      if (this.closed) return;
       this.bridgeConfig = config;
       const settings = this.host.getSettings();
       let changed = false;
@@ -1752,6 +1823,7 @@ export class AuxBrainView extends ItemView {
         changed = true;
       }
       if (changed) await this.host.saveSettings();
+      if (!this.closed) this.host.promptLlmSetup(config, () => void this.reloadConfiguration());
     } catch (error) {
       this.bridgeConfig = null;
       this.configurationError = `本地服务未连接：${friendlyError(error)}`;

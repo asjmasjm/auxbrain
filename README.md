@@ -5,9 +5,13 @@ inspect supporting evidence, and build a local human-reviewed knowledge graph.
 
 > [!IMPORTANT]
 > AuxBrain is currently distributed as a public beta through GitHub and BRAT. It is
-> not published in the official Obsidian Community directory. Version 0.8.4 includes a
+> not published in the official Obsidian Community directory. Plugin 0.8.5 uses a
 > separately distributed Windows x64 Companion to the GitHub release. The Companion
 > contains proprietary AuxBrain algorithms and is not open source.
+
+Plugin 0.8.5 adds first-use LLM setup and automatic paper switching. The local
+algorithm service remains Companion 0.8.4; existing 0.8.4 users only need to update
+the plugin for these interface improvements.
 
 ## Requirements
 
@@ -27,9 +31,9 @@ loopback service and are not stored in the Obsidian plugin data file.
 1. Install and enable BRAT from Obsidian's Community plugins browser.
 2. Open **Settings -> BRAT -> Add beta plugin**.
 3. Enter `https://github.com/asjmasjm/auxbrain`.
-4. Choose `Latest` (currently 0.8.4), or select 0.8.4 explicitly, then install
+4. Choose `Latest` (currently 0.8.5), or select 0.8.5 explicitly, then install
    and enable AuxBrain.
-5. Download [AuxBrain-Companion-0.8.4-win-x64.zip](https://github.com/asjmasjm/auxbrain/releases/download/0.8.4/AuxBrain-Companion-0.8.4-win-x64.zip).
+5. Download [AuxBrain-Companion-0.8.4-win-x64.zip](https://github.com/asjmasjm/auxbrain/releases/download/0.8.5/AuxBrain-Companion-0.8.4-win-x64.zip).
 6. Verify its SHA-256, extract the ZIP, and run `AuxBrain-Companion.exe`.
 
 ### Manual installation
@@ -43,13 +47,14 @@ Copy these release assets into `<vault>/.obsidian/plugins/auxbrain/`:
 Restart Obsidian or disable and re-enable AuxBrain after replacing the files.
 
 Then download the matching Companion ZIP from the
-[0.8.4 Beta release](https://github.com/asjmasjm/auxbrain/releases/tag/0.8.4),
+[0.8.5 Beta release](https://github.com/asjmasjm/auxbrain/releases/tag/0.8.5),
 verify its SHA-256, extract it, and run `AuxBrain-Companion.exe`.
 
-### Upgrade from 0.8.2 or 0.8.3
+### Upgrade
 
-Update the plugin to 0.8.4 through BRAT or replace the three plugin files above.
-Stop the old Companion, extract the new 0.8.4 ZIP, and start its executable.
+Update the plugin to 0.8.5 through BRAT or replace the three plugin files above.
+If your Companion is older than 0.8.4, stop it, extract the 0.8.4 ZIP, and start
+its executable. An existing Companion 0.8.4 does not need to be replaced.
 Keep using the same profile or `--db` path: existing personal data is retained and
 the database schema is upgraded automatically. BRAT updates only the plugin;
 the Companion must be updated separately.
@@ -94,6 +99,17 @@ suggestions, question history, and model provenance.
 - AuxBrain does not include client-side telemetry or advertising.
 
 ## Usage
+
+When you first open AuxBrain without a configured API Key, it opens the LLM setup
+dialog. Select a provider and model, then configure and test your key. Dismissing
+the dialog leaves a setup action in the panel. If the Companion is not running,
+start it and use the reconnect button to continue setup.
+
+The panel follows the active Markdown or PDF tab, loading the corresponding title
+and question history automatically. While an answer or knowledge write is running,
+the current paper stays attached to that task; the panel switches to the most recently
+opened paper when the task finishes. Returning focus to the same paper keeps the
+current question or annotation.
 
 1. Open a Markdown note or PDF paper.
 2. Click the AuxBrain ribbon icon, run `向当前文档提问`, or right-click and choose the

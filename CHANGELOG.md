@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.5
+
+- Prompt for provider, model, and API Key setup when first opening AuxBrain without a configured key. Keep a setup action available after dismissal.
+- Follow the active Markdown or PDF document, refresh its title and question history, and clear answers and evidence belonging to the previous paper.
+- Defer document switches while answering or writing knowledge; discard stale document reads and history responses.
+- Preserve the chosen provider and model when entering API Key setup and returning to answer-mode settings.
+- Add workflow regression tests. Continue using Companion 0.8.4; this release changes only the plugin.
+
 ## 0.8.4
 
 - Rebuild the Windows Companion from the current backend source, including Ark thinking-mode forwarding and current algorithm dependencies.

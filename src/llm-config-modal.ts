@@ -17,18 +17,21 @@ export interface LlmConfigurationHost {
 export class LlmConfigurationModal extends Modal {
   private statusEl: HTMLElement | null = null;
   private providerSpec: LlmProviderConfig | null = null;
+  private closed = false;
 
   constructor(
     app: App,
     private readonly host: LlmConfigurationHost,
     private readonly provider: LlmProvider,
     private readonly onSaved?: () => void,
-    private readonly onBack?: () => void
+    private readonly onBack?: () => void,
+    private readonly onClosed?: () => void
   ) {
     super(app);
   }
 
   onOpen(): void {
+    this.closed = false;
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass("fkms-llm-modal");
@@ -51,9 +54,16 @@ export class LlmConfigurationModal extends Modal {
     void this.loadProvider();
   }
 
+  onClose(): void {
+    this.closed = true;
+    this.contentEl.empty();
+    this.onClosed?.();
+  }
+
   private async loadProvider(): Promise<void> {
     try {
       const config = await this.host.client().configuration();
+      if (this.closed) return;
       this.providerSpec = findLlmProvider(config, this.provider) ?? null;
       if (!this.providerSpec) throw new Error("找不到所选 LLM 提供商");
       this.renderForm();

@@ -1384,6 +1384,39 @@
   white-space: pre-wrap;
 }
 
+.fkms-setup-status,
+.fkms-document-status {
+  align-items: center;
+  border-left: 2px solid var(--text-accent);
+  color: var(--text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: var(--font-ui-small);
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+  padding: 8px 10px;
+}
+
+.fkms-setup-status button {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.fkms-document-spinner {
+  animation: fkms-document-spin 1s linear infinite;
+  display: inline-flex;
+  flex: 0 0 16px;
+  height: 16px;
+  width: 16px;
+}
+
+@keyframes fkms-document-spin {
+  to { transform: rotate(360deg); }
+}
+
 .fkms-settings-status {
   margin-top: 14px;
   border-left: 3px solid #38bdf8;

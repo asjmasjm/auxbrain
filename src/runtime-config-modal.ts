@@ -30,7 +30,9 @@ export class RuntimeConfigurationModal extends Modal {
     app: App,
     private readonly host: RuntimeConfigurationHost,
     private readonly config: BridgeConfig,
-    private readonly onSaved?: () => void
+    private readonly onSaved?: () => void,
+    private readonly firstUse = false,
+    private readonly onClosed?: () => void
   ) {
     super(app);
     const settings = host.getSettings();
@@ -43,12 +45,17 @@ export class RuntimeConfigurationModal extends Modal {
     this.renderForm();
   }
 
+  onClose(): void {
+    this.contentEl.empty();
+    this.onClosed?.();
+  }
+
   private renderForm(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass("fkms-runtime-modal");
     const heading = contentEl.createDiv({ cls: "fkms-modal-heading" });
-    heading.createEl("h2", { text: "回答模式" });
+    heading.createEl("h2", { text: this.firstUse ? "首次使用 · 设置 LLM" : "回答模式" });
     const info = heading.createEl("button", {
       cls: "clickable-icon fkms-modal-info",
       attr: {
@@ -125,9 +132,18 @@ export class RuntimeConfigurationModal extends Modal {
     const keyIcon = keyButton.createSpan({ cls: "fkms-button-icon" });
     setIcon(keyIcon, "key-round");
     keyButton.createSpan({ text: provider?.configured ? "更新 Key" : "配置 Key" });
-    keyButton.onclick = () => {
-      this.close();
-      this.openKeyConfiguration();
+    keyButton.onclick = async () => {
+      keyButton.disabled = true;
+      save.disabled = true;
+      try {
+        await this.saveSelection();
+        this.close();
+        this.openKeyConfiguration();
+      } catch (error) {
+        new Notice(`回答模式保存失败：${error instanceof Error ? error.message : String(error)}`);
+        keyButton.disabled = false;
+        save.disabled = false;
+      }
     };
 
     const cancel = actions.createEl("button", {
@@ -142,14 +158,10 @@ export class RuntimeConfigurationModal extends Modal {
       attr: { type: "button" }
     });
     save.onclick = async () => {
-      const settings = this.host.getSettings();
-      settings.analysisMode = this.mode;
-      settings.llmProvider = this.provider;
-      settings.llmModel = this.model;
       save.disabled = true;
+      keyButton.disabled = true;
       try {
-        await this.host.saveSettings();
-        this.onSaved?.();
+        await this.saveSelection();
         this.close();
         if (!provider?.configured) {
           this.openKeyConfiguration();
@@ -157,8 +169,18 @@ export class RuntimeConfigurationModal extends Modal {
       } catch (error) {
         new Notice(`回答模式保存失败：${error instanceof Error ? error.message : String(error)}`);
         save.disabled = false;
+        keyButton.disabled = false;
       }
     };
+  }
+
+  private async saveSelection(): Promise<void> {
+    const settings = this.host.getSettings();
+    settings.analysisMode = this.mode;
+    settings.llmProvider = this.provider;
+    settings.llmModel = this.model;
+    await this.host.saveSettings();
+    this.onSaved?.();
   }
 
   private openKeyConfiguration(): void {

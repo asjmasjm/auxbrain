@@ -13,10 +13,18 @@ interface PdfTextItem {
 export async function readActiveDocument(app: App): Promise<DraftSelection> {
   const file = app.workspace.getActiveFile();
   if (!file) throw new Error("请先打开一篇 Markdown 或 PDF 文档");
+  return readDocument(app, file);
+}
 
+export async function readDocument(
+  app: App,
+  file: TFile,
+  signal?: AbortSignal
+): Promise<DraftSelection> {
+  assertNotAborted(signal);
   const extension = file.extension.toLocaleLowerCase();
   if (extension === "md") return readMarkdownDocument(app, file);
-  if (extension === "pdf") return readPdfDocument(app, file);
+  if (extension === "pdf") return readPdfDocument(app, file, signal);
   throw new Error("当前仅支持对 Markdown 和 PDF 文档直接提问");
 }
 
@@ -33,16 +41,18 @@ async function readMarkdownDocument(app: App, file: TFile): Promise<DraftSelecti
   };
 }
 
-async function readPdfDocument(app: App, file: TFile): Promise<DraftSelection> {
+async function readPdfDocument(app: App, file: TFile, signal?: AbortSignal): Promise<DraftSelection> {
   const pdfjs = await loadPdfJs();
   const bytes = await app.vault.readBinary(file);
+  assertNotAborted(signal);
   const loadingTask = pdfjs.getDocument({ data: new Uint8Array(bytes) });
-  const document = await loadingTask.promise;
   const segments: DocumentSegment[] = [];
   let characterCount = 0;
 
   try {
+    const document = await loadingTask.promise;
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+      assertNotAborted(signal);
       const page = await document.getPage(pageNumber);
       const content = await page.getTextContent();
       const pageSegments = pdfPageSegments(
@@ -72,6 +82,10 @@ async function readPdfDocument(app: App, file: TFile): Promise<DraftSelection> {
     sourceType: "pdf",
     segments
   };
+}
+
+function assertNotAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new Error("文档读取已取消");
 }
 
 function markdownSegments(text: string): DocumentSegment[] {
