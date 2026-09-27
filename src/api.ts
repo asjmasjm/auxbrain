@@ -17,7 +17,7 @@ import {
 
 const EXPECTED_COMPANION_SERVICE = "auxbrain-companion";
 const EXPECTED_API_PROTOCOL_VERSION = 1;
-const MINIMUM_COMPANION_VERSION = "0.8.4";
+const MINIMUM_COMPANION_VERSION = "0.9.1";
 
 export class AuxBrainClient {
   private readonly baseUrl: string;
@@ -212,7 +212,7 @@ export class AuxBrainClient {
   private assertCompatibleCompanion(config: BridgeConfig): void {
     if (
       config.service !== EXPECTED_COMPANION_SERVICE ||
-      typeof config.service_version !== "string"
+      !isCompatibleCompanionVersion(config.service_version)
     ) {
       throw new Error(`本地服务版本过旧，请下载并启动 Companion ${MINIMUM_COMPANION_VERSION}`);
     }
@@ -226,4 +226,14 @@ export class AuxBrainClient {
 
 function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+export function isCompatibleCompanionVersion(version: unknown): boolean {
+  if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/.test(version)) return false;
+  const actual = version.split(".").map(Number);
+  const minimum = MINIMUM_COMPANION_VERSION.split(".").map(Number);
+  for (let index = 0; index < 3; index++) {
+    if (actual[index] !== minimum[index]) return actual[index] > minimum[index];
+  }
+  return true;
 }

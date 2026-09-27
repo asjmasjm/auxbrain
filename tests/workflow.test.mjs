@@ -12,14 +12,24 @@ await build({
   stdin: { contents: `export { default as AuxBrainPlugin } from './src/main';
     export { AuxBrainView } from './src/view';
     export { readDocument } from './src/document-reader';
+    export { isCompatibleCompanionVersion } from './src/api';
     export * from './tests/obsidian-mock';`, resolveDir: process.cwd() },
   bundle: true, platform: "node", format: "cjs", outfile: bundle,
   alias: { obsidian: path.resolve("tests/obsidian-mock.ts") }
 });
-const { AuxBrainPlugin, AuxBrainView, FileView, Setting, readDocument } = createRequire(import.meta.url)(bundle);
+const { AuxBrainPlugin, AuxBrainView, FileView, Setting, readDocument, isCompatibleCompanionVersion } = createRequire(import.meta.url)(bundle);
 after(() => rm(root, { recursive: true, force: true }));
 globalThis.document = { addEventListener() {}, removeEventListener() {} };
 globalThis.window = globalThis;
+
+test("0.9.1 rejects old or malformed Companion versions", () => {
+  for (const value of [undefined, null, "", "0.8.2", "0.8.4", "0.9.0", "bad", "0.9.1-beta"]) {
+    assert.equal(isCompatibleCompanionVersion(value), false, String(value));
+  }
+  for (const value of ["0.9.1", "0.9.2", "0.10.0", "1.0.0"]) {
+    assert.equal(isCompatibleCompanionVersion(value), true, value);
+  }
+});
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 function deferred() {

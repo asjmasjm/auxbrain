@@ -5,19 +5,19 @@ inspect supporting evidence, and build a local human-reviewed knowledge graph.
 
 > [!IMPORTANT]
 > AuxBrain is currently distributed as a public beta through GitHub and BRAT. It is
-> not published in the official Obsidian Community directory. Plugin 0.8.5 uses a
+> not published in the official Obsidian Community directory. Plugin 0.9.1 uses a
 > separately distributed Windows x64 Companion to the GitHub release. The Companion
 > contains proprietary AuxBrain algorithms and is not open source.
 
-Plugin 0.8.5 adds first-use LLM setup and automatic paper switching. The local
-algorithm service remains Companion 0.8.4; existing 0.8.4 users only need to update
-the plugin for these interface improvements.
+Plugin and Companion 0.9.1 integrate the shared AuxBrain question-answering engine
+and hierarchical evidence selector. First-use LLM setup and automatic paper
+switching remain available. Upgrade both components together.
 
 ## Requirements
 
 - Obsidian Desktop 1.5.0 or later.
 - Windows 10 or 11 x64.
-- AuxBrain Companion 0.8.4 running on the same computer.
+- AuxBrain Companion 0.9.1 running on the same computer.
 - A DeepSeek API key or Volcengine Coding Plan API key.
 
 The current release supports the official DeepSeek API and Volcengine Coding Plan.
@@ -31,9 +31,9 @@ loopback service and are not stored in the Obsidian plugin data file.
 1. Install and enable BRAT from Obsidian's Community plugins browser.
 2. Open **Settings -> BRAT -> Add beta plugin**.
 3. Enter `https://github.com/asjmasjm/auxbrain`.
-4. Choose `Latest` (currently 0.8.5), or select 0.8.5 explicitly, then install
+4. Choose release `0.9.1`, then install
    and enable AuxBrain.
-5. Download [AuxBrain-Companion-0.8.4-win-x64.zip](https://github.com/asjmasjm/auxbrain/releases/download/0.8.5/AuxBrain-Companion-0.8.4-win-x64.zip).
+5. Download [AuxBrain-Companion-0.9.1-win-x64.zip](https://github.com/asjmasjm/auxbrain/releases/download/0.9.1/AuxBrain-Companion-0.9.1-win-x64.zip).
 6. Verify its SHA-256, extract the ZIP, and run `AuxBrain-Companion.exe`.
 
 ### Manual installation
@@ -47,21 +47,21 @@ Copy these release assets into `<vault>/.obsidian/plugins/auxbrain/`:
 Restart Obsidian or disable and re-enable AuxBrain after replacing the files.
 
 Then download the matching Companion ZIP from the
-[0.8.5 Beta release](https://github.com/asjmasjm/auxbrain/releases/tag/0.8.5),
+[0.9.1 Beta release](https://github.com/asjmasjm/auxbrain/releases/tag/0.9.1),
 verify its SHA-256, extract it, and run `AuxBrain-Companion.exe`.
 
 ### Upgrade
 
-Update the plugin to 0.8.5 through BRAT or replace the three plugin files above.
-If your Companion is older than 0.8.4, stop it, extract the 0.8.4 ZIP, and start
-its executable. An existing Companion 0.8.4 does not need to be replaced.
+Update the plugin to 0.9.1 through BRAT or replace the three plugin files above.
+Stop the old Companion, back up the profile directory, extract the 0.9.1 ZIP, and
+start its executable. Older Companion versions are not compatible with this plugin.
 Keep using the same profile or `--db` path: existing personal data is retained and
 the database schema is upgraded automatically. BRAT updates only the plugin;
 the Companion must be updated separately.
 
 `build-info.json` in the ZIP records the build time, backend source revision,
 whether local changes were included, a source fingerprint, and the executable hash.
-Companion 0.8.4 is a new build, not a renamed copy of Companion 0.8.2.
+Companion 0.9.1 is rebuilt from the updated backend, not a renamed older binary.
 
 ## Local service
 
@@ -71,7 +71,7 @@ endpoint is `http://127.0.0.1:8795`, and the service refuses non-loopback bind
 addresses.
 
 > [!WARNING]
-> Companion 0.8.4 Beta is not code-signed. Microsoft Defender SmartScreen may warn
+> Companion 0.9.1 Beta is not code-signed. Microsoft Defender SmartScreen may warn
 > before first launch. Download it only from the official AuxBrain GitHub release and
 > compare its SHA-256 with `SHA256SUMS.txt`. Do not disable SmartScreen or antivirus
 > globally. Proceed only when the source and hash match.
@@ -130,13 +130,20 @@ document or start the other operation.
 
 ## Answer modes
 
-- `AuxBrain`: uses the selected LLM and then applies AuxBrain evidence and confidence
-  correction.
+- `AuxBrain`: uses the shared hierarchical evidence selector, LLM answer synthesis,
+  and evidence-confidence checks. A single question may make multiple model requests;
+  available token usage is accumulated across those requests.
 - `LLM-Only`: uses the selected LLM without AuxBrain correction or algorithm fallback.
 
 Mode, provider, and model are configured from **回答模式**. The information button in
 that dialog shows the currently supported LLM services. The API Key screen includes a
 back action that returns to the answer-mode dialog.
+
+Each question indexes the current document in a temporary local database, which is
+removed after the request. This release does not merge previously reviewed knowledge
+into that temporary question index. Question history remains in the personal database;
+only explicit acceptance or correction writes reviewed relations there. PDF evidence
+retains its original page and text position for navigation and highlighting.
 
 ## Development
 

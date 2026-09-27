@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.1
+
+- Use the shared document QA service and v16 hierarchical evidence selection in AuxBrain mode. Keep LLM-Only on its independent path.
+- Index the current document temporarily, preserve PDF/Markdown evidence locations, and keep question history separate from confirmed knowledge.
+- Show evidence selection as its own processing stage and account for selector and answer token usage.
+- Require Companion 0.9.1 and actually compare its semantic version, rather than only checking that a version field exists.
+- Distribute an updated Windows x64 Companion with build provenance. Existing knowledge remains in the user's local database.
+
+
 ## 0.8.5
 
 - Prompt for provider, model, and API Key setup when first opening AuxBrain without a configured key. Keep a setup action available after dismissal.
