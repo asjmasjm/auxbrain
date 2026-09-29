@@ -1,5 +1,5 @@
 import { App, MarkdownView, Notice, TFile, WorkspaceLeaf } from "obsidian";
-import { DraftSelection, UnderstandingEvidence } from "./contracts";
+import { DraftSelection, UnderstandingEvidence, evidenceHighlightText } from "./contracts";
 
 interface TextPosition {
   node: Text;
@@ -58,7 +58,12 @@ async function openPdfEvidence(
   await app.workspace.openLinkText(`${file.path}${subpath}`, "", false);
 
   const targetLeaf = findFileLeaf(app, file.path) ?? leaf;
-  const highlighted = await waitForPdfEvidence(targetLeaf, page, evidence.text);
+  const highlighted = await waitForPdfEvidence(targetLeaf, page, evidenceHighlightText(evidence));
+  const lastPage = positiveInteger(evidence.locator.page_end);
+  if (lastPage > page) {
+    new Notice(`证据跨第 ${page}-${lastPage} 页，已打开起始页${highlighted ? "并高亮本页内容" : "；本页未找到可高亮的完整片段"}`);
+    return;
+  }
   if (!highlighted && !selection) {
     new Notice(`已定位到第 ${page} 页，但没有找到可高亮的证据原文`);
   }
@@ -102,7 +107,7 @@ async function openMarkdownEvidence(
   const root = view.containerEl.querySelector<HTMLElement>(
     ".markdown-preview-view, .markdown-rendered"
   );
-  if (!root || !highlightRenderedText(root, evidence.text)) {
+  if (!root || !highlightRenderedText(root, evidenceHighlightText(evidence))) {
     new Notice("已打开源文档，但阅读视图未找到完整证据；可切换到编辑视图重试");
   }
 }

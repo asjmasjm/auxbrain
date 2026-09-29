@@ -1,0 +1,80 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>安装与升级</title><style>
+:root { color-scheme: light; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }
+body { margin: 0; color: #19252d; background: #fff; line-height: 1.8; }
+main { max-width: 1160px; margin: 0 auto; padding: 32px 28px 72px; }
+h1 { font-size: 28px; border-bottom: 3px solid #169cb5; padding-bottom: 16px; }
+h2 { font-size: 23px; margin-top: 40px; border-top: 1px solid #dce4e7; padding-top: 24px; }
+h3 { font-size: 18px; }
+a { color: #007c99; overflow-wrap: anywhere; }
+p, li, td, th { overflow-wrap: anywhere; }
+img { display: block; max-width: 100%; height: auto; border: 1px solid #dce4e7; margin: 18px 0 8px; }
+blockquote { margin: 20px 0; padding: 10px 18px; border-left: 4px solid #169cb5; background: #f1f8fa; }
+blockquote p { margin: 4px 0; }
+pre { padding: 14px 18px; background: #f3f5f6; overflow-x: auto; }
+code { font-family: Consolas, monospace; font-size: 0.94em; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+td, th { padding: 10px; text-align: left; border: 1px solid #dce4e7; }
+th { background: #eff5f7; }
+em { color: #556570; }
+nav { border-bottom: 1px solid #dce4e7; padding-bottom: 12px; font-size: 14px; }
+@media(max-width: 600px) { main { padding: 18px 14px 40px; } h1 { font-size: 24px; } table { font-size: 12px; } td,th { padding: 6px; } }
+@media print { main { max-width: none; padding: 0; } h2 { break-after: avoid; } img { break-inside: avoid; } nav { display: none; } }
+</style></head><body><main><nav><a href="00-文档导航.html">文档导航</a> | <a href="01-安装与升级.html">安装与升级</a> | <a href="02-使用教程.html">使用教程</a> | <a href="03-个人论文知识库.html">个人论文知识库</a> | <a href="04-版本核对与故障排查.html">版本核对与故障排查</a> | <a href="05-服务商与隐私.html">服务商与隐私</a> | <a href="06-更新说明.html">更新说明</a> | <a href="PROVIDER-USAGE.html">PROVIDER-USAGE</a></nav><h1>AuxBrain v0.11.2 安装与升级</h1>
+<h2>需要准备</h2>
+<p>Windows 10/11 x64、Obsidian 桌面版 1.5.0 或以上，以及你本人有权用于此工作流的模型服务账户。先阅读 <a href="05-%E6%9C%8D%E5%8A%A1%E5%95%86%E4%B8%8E%E9%9A%90%E7%A7%81.html">服务商与隐私</a>，不要把供应商选项当作套餐授权。</p>
+<p>插件与 Companion 都需要安装。无需安装 Python、Conda，也无需手动建数据库。算法包含在闭源便携程序中，GitHub 自动生成的 Source code ZIP 不是运行包。</p>
+<h2>配套文件</h2>
+<p>目标发布页：<a href="https://github.com/asjmasjm/auxbrain/releases/tag/0.11.2">0.11.2 Beta</a>。以实际公开附件为准；发布前请使用随本次交付提供的本地文件。</p>
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AuxBrain-Plugin-0.11.2.zip</td>
+<td>手动安装插件，内含 auxbrain 文件夹</td>
+</tr>
+<tr>
+<td>main.js、manifest.json、styles.css</td>
+<td>BRAT 使用的三个独立插件附件</td>
+</tr>
+<tr>
+<td>AuxBrain-Companion-0.11.2-win-x64.zip</td>
+<td>本地算法与数据库服务</td>
+</tr>
+<tr>
+<td>AuxBrain-0.11.2-beta-guide.zip</td>
+<td>本套 Markdown、HTML 和图示</td>
+</tr>
+<tr>
+<td>SHA256SUMS.txt</td>
+<td>核对以上附件的 SHA-256</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-powershell">Get-FileHash &quot;$env:USERPROFILE\Downloads\AuxBrain-Companion-0.11.2-win-x64.zip&quot; -Algorithm SHA256
+</code></pre>
+<p>将结果与同一次发布的 <code>SHA256SUMS.txt</code> 比较，不使用旧教程中的哈希。</p>
+<h2>第一次安装</h2>
+<ol>
+<li>完整解压 Companion ZIP，运行 <code>AuxBrain-Companion.exe</code>，使用插件期间保持服务运行。</li>
+<li>BRAT 安装：在 Obsidian 安装并启用 BRAT，添加 <code>https://github.com/asjmasjm/auxbrain</code>，选择 <code>0.11.2</code>，启用 AuxBrain。</li>
+<li>手动安装：把插件 ZIP 内的 <code>auxbrain</code> 文件夹放到当前 vault 的 <code>.obsidian/plugins/</code>，在第三方插件中启用。不要出现 <code>auxbrain/auxbrain/main.js</code> 的多余嵌套。</li>
+<li>打开带文字层的 PDF 或 Markdown，载入 AuxBrain，按照首次提示配置模型。保存 Key 不自动测试；测试连接需单独点击。</li>
+</ol>
+<p><strong>安全提示：Windows Companion 为未签名 Beta。</strong> SmartScreen 可能拦截。只从确认的来源下载并核对哈希；是否继续运行由用户自行决定，不要全局关闭 SmartScreen 或杀毒软件。单位管理的电脑应遵守管理员策略。</p>
+<h2>从旧版升级</h2>
+<ol>
+<li>等问答、入库和后台整理完成，退出旧 Companion。</li>
+<li>在服务停止后备份整个 profile 目录，包含可能存在的 SQLite 附属文件。</li>
+<li>解压新的 Companion，保留原 profile 或自定义 <code>--db</code> 参数，启动新版。</li>
+<li>BRAT 更新插件或替换三个插件文件。BRAT 不负责更新 Companion。</li>
+<li>在「设置 → 第三方插件」中关闭再开启 AuxBrain。只关闭侧栏不会重新加载代码。</li>
+</ol>
+<p>默认数据库：<code>%LOCALAPPDATA%\AuxBrain\profiles\default\auxbrain.sqlite</code>。</p>
+<p>默认接口：<code>http://127.0.0.1:8795</code>。首次运行自动建库，旧库自动迁移；不需要删除原库。插件要求 Companion 至少 0.11.2 且协议为 1，建议使用本版配套包，不要只升级一端。</p>
+<p>进入 <a href="02-%E4%BD%BF%E7%94%A8%E6%95%99%E7%A8%8B.html">使用教程</a>。</p>
+</main></body></html>

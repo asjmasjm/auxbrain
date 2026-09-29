@@ -1,0 +1,58 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>服务商与隐私</title><style>
+:root { color-scheme: light; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }
+body { margin: 0; color: #19252d; background: #fff; line-height: 1.8; }
+main { max-width: 1160px; margin: 0 auto; padding: 32px 28px 72px; }
+h1 { font-size: 28px; border-bottom: 3px solid #169cb5; padding-bottom: 16px; }
+h2 { font-size: 23px; margin-top: 40px; border-top: 1px solid #dce4e7; padding-top: 24px; }
+h3 { font-size: 18px; }
+a { color: #007c99; overflow-wrap: anywhere; }
+p, li, td, th { overflow-wrap: anywhere; }
+img { display: block; max-width: 100%; height: auto; border: 1px solid #dce4e7; margin: 18px 0 8px; }
+blockquote { margin: 20px 0; padding: 10px 18px; border-left: 4px solid #169cb5; background: #f1f8fa; }
+blockquote p { margin: 4px 0; }
+pre { padding: 14px 18px; background: #f3f5f6; overflow-x: auto; }
+code { font-family: Consolas, monospace; font-size: 0.94em; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+td, th { padding: 10px; text-align: left; border: 1px solid #dce4e7; }
+th { background: #eff5f7; }
+em { color: #556570; }
+nav { border-bottom: 1px solid #dce4e7; padding-bottom: 12px; font-size: 14px; }
+@media(max-width: 600px) { main { padding: 18px 14px 40px; } h1 { font-size: 24px; } table { font-size: 12px; } td,th { padding: 6px; } }
+@media print { main { max-width: none; padding: 0; } h2 { break-after: avoid; } img { break-inside: avoid; } nav { display: none; } }
+</style></head><body><main><nav><a href="00-文档导航.html">文档导航</a> | <a href="01-安装与升级.html">安装与升级</a> | <a href="02-使用教程.html">使用教程</a> | <a href="03-个人论文知识库.html">个人论文知识库</a> | <a href="04-版本核对与故障排查.html">版本核对与故障排查</a> | <a href="05-服务商与隐私.html">服务商与隐私</a> | <a href="06-更新说明.html">更新说明</a> | <a href="PROVIDER-USAGE.html">PROVIDER-USAGE</a></nav><h1>AuxBrain v0.11.2 服务商与隐私</h1>
+<p>本文更新软件行为说明，不是新的法律意见或供应商授权。套餐条款审阅沿用 2026-09-28 的记录；使用前应阅读官方当前条款并自行核实适用范围。</p>
+<h2>三类接入选项</h2>
+<table>
+<thead>
+<tr>
+<th>选项</th>
+<th>需要注意</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DeepSeek 官网 API</td>
+<td>使用个人有权使用的开放平台账户，遵守其协议、数据和计费规则</td>
+</tr>
+<tr>
+<td>火山 Coding Plan</td>
+<td>论文问答、HIL 及无人值守后台整理的套餐适用范围仍待供应商确认</td>
+</tr>
+<tr>
+<td>腾讯 Token Plan</td>
+<td>可选适配器不等于授权；既有条款审阅记录包含自定义应用后端等限制，未经确认不得把本地后端视作自动豁免</td>
+</tr>
+</tbody>
+</table>
+<p>官方条款和更多技术说明见随包的 <a href="PROVIDER-USAGE.html">PROVIDER-USAGE.md</a>。模式与 Key 配置页的 <strong>声明</strong> 可随时打开；关闭声明不改变当前选择，也不构成免责声明式的授权。</p>
+<p>模型是否可用取决于账户与当前目录。Auto 表示供应商路由，不保证固定模型。适配器不自动购买套餐，不在认证失败时切换供应商，也不静默切到普通按量付费接口。</p>
+<h2>Key 与费用</h2>
+<p>每人使用自己的 Key。保存与测试分开：保存只写本机凭据，测试会发送短提示并可能消耗额度；正式提问会发送所需论文上下文。一次 AuxBrain 提问可能多次调用模型，重试也是新的费用或配额消耗。</p>
+<p>Key 不写进插件的 <code>data.json</code>，腾讯凭据与其他供应商分开保存。不应公开源码配置、凭据、截图或日志中的 Key；已泄露的 Key 应在服务商后台撤销或轮换。</p>
+<h2>哪些数据在本地，哪些会联网</h2>
+<p>个人 SQLite 数据库、已记录的历史、知识和审核事件保留在本机。插件通过回环接口访问 Companion；Companion 在 LLM 工作流中把问题及必要论文上下文发给所选供应商。</p>
+<p>本地建库不意味着所有处理离线。不要上传无权披露的论文、商业机密或个人信息。发布包不包含开发者数据库、论文或 API Key。</p>
+<h2>后台整理是独立配置</h2>
+<p>默认档案整理在本地生成摘录候选。命令行的 <code>--dossier-llm</code> 才启用 DeepSeek 后台整理与证据审核，可能发送问答及证据内容并消耗额度。它不跟随前台供应商下拉框，也不会因升级 0.11.2 自动启用。</p>
+<p>开始使用新的后台云端工作流前，应另行确认授权、费用和数据发送范围。</p>
+</main></body></html>

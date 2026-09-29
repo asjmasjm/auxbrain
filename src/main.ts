@@ -54,6 +54,7 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
   private configurationModal: Modal | null = null;
   private configurationOpening = false;
   private unloaded = false;
+  private contextMenuDocuments = new WeakSet<Document>();
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -66,13 +67,15 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
       if (file) this.trackDocument(file);
     }));
     this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => {
+      this.registerContextMenuDocument(leaf?.view.containerEl.ownerDocument);
       if (leaf?.view instanceof FileView && leaf.view.file) {
         this.trackDocument(leaf.view.file);
       }
     }));
     this.app.workspace.onLayoutReady(() => {
       if (this.unloaded) return;
-      const file = this.app.workspace.getActiveFile();
+      this.app.workspace.iterateAllLeaves(leaf => this.registerContextMenuDocument(leaf.view.containerEl.ownerDocument));
+      const file = this.currentDocumentFile();
       if (file) this.trackDocument(file);
     });
 
@@ -98,14 +101,14 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
 
     this.addCommand({
       id: "configure-llm",
-      name: "配置 AuxBrain API Key",
+      name: "配置 AuxBrain 接口密钥",
       callback: () => this.openLlmConfiguration()
     });
 
     this.registerEvent(
       this.app.workspace.on("editor-menu", (menu, editor, view) => {
         const selectedText = editor.getSelection().trim();
-        this.addDocumentQuestionMenuItem(menu);
+        this.addDocumentQuestionMenuItem(menu, view.file ?? undefined);
         if (selectedText) {
           this.addAnnotationMenuItem(menu, async () => selectedText, {
             sourcePath: view.file?.path ?? "untitled",
@@ -114,6 +117,13 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
         }
       })
     );
+
+    this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
+      if (file instanceof TFile) this.addDocumentQuestionMenuItem(menu, file);
+    }));
+    this.registerEvent(this.app.workspace.on("window-open", (_workspaceWindow, openedWindow) => {
+      this.registerContextMenuDocument(openedWindow.document);
+    }));
 
     this.registerDomEvent(document, "selectionchange", () => {
       const selection = window.getSelection()?.toString().trim() ?? "";
@@ -124,30 +134,7 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
       if (selection) this.lastSelectedText = selection;
     });
 
-    const contextMenuHandler = (event: MouseEvent): void => {
-      if (this.isEditableTarget(event.target)) return;
-      const file = this.app.workspace.getActiveFile();
-      const activeIsPdf = file?.extension.toLowerCase() === "pdf";
-      const selection = window.getSelection()?.toString().trim() || this.lastSelectedText;
-      if (!selection && !activeIsPdf) return;
-      const menu = new Menu();
-      this.addDocumentQuestionMenuItem(menu);
-      if (selection) {
-        this.addAnnotationMenuItem(menu, () => this.resolveSelectedText(selection), {
-          sourcePath: file?.path ?? "selection",
-          title: file?.basename ?? "Obsidian selection"
-        });
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      menu.showAtMouseEvent(event);
-    };
-    document.addEventListener("contextmenu", contextMenuHandler, { capture: true });
-    this.register(() => {
-      document.removeEventListener("contextmenu", contextMenuHandler, {
-        capture: true
-      });
-    });
+    this.registerContextMenuDocument(document);
 
     this.addCommand({
       id: "open-fkms-view",
@@ -176,14 +163,16 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
     draft: DraftSelection,
     question: string,
     topN: number,
-    onProgress?: (job: UnderstandingJob) => void
+    onProgress?: (job: UnderstandingJob) => void,
+    requestKey?: string
   ): Promise<UnderstandingResult> {
     return this.client().understand(
       draft,
       question,
       topN,
       this.settings,
-      onProgress
+      onProgress,
+      requestKey
     );
   }
 
@@ -230,7 +219,7 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
         this.settings.analysisMode !== "algorithm"
         && !(await this.ensureLlmCredential())
       ) {
-        throw new Error("请先配置当前 LLM 提供商的 API Key");
+        throw new Error("请先配置当前 LLM 提供商的 接口密钥");
       }
       return await this.client().analyzeInterpretation(
         draft,
@@ -242,13 +231,13 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
     }
   }
 
-  async loadActiveDocument(): Promise<void> {
+  async loadActiveDocument(requestedFile?: TFile): Promise<void> {
     const currentView = this.currentAuxBrainView();
     if (currentView?.isWorkflowBusy()) {
       new Notice(currentView.workflowBusyMessage());
       return;
     }
-    const file = this.app.workspace.getActiveFile() ?? this.activeDocument;
+    const file = requestedFile ?? this.currentDocumentFile();
     if (!file) throw new Error("请先打开一篇 Markdown 或 PDF 文档");
     this.activeDocument = file;
     await this.activateView();
@@ -256,7 +245,7 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
   }
 
   onViewOpened(): void {
-    this.activeDocument = this.app.workspace.getActiveFile() ?? this.activeDocument;
+    this.activeDocument = this.currentDocumentFile();
     void this.syncDocument();
   }
 
@@ -403,15 +392,34 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
     });
   }
 
-  private addDocumentQuestionMenuItem(menu: Menu): void {
+  private currentDocumentFile(): TFile | null {
+    const active = this.app.workspace.getActiveFile();
+    const recent = this.app.workspace.getMostRecentLeaf()?.view;
+    return active ?? (recent instanceof FileView ? recent.file : null) ?? this.activeDocument;
+  }
+
+  private addDocumentQuestionMenuItem(menu: Menu, file = this.currentDocumentFile()): boolean {
+    const view = this.currentAuxBrainView();
+    const loaded = view?.hasDocumentContext(file?.path ?? "");
+    const right = this.app.workspace.rightSplit;
+    const hiddenInDock = view && right.collapsed && view.containerEl.closest(".mod-right-split");
+    const visible = view?.containerEl.isShown() && !hiddenInDock;
+    if (!file || !["pdf", "md"].includes(file.extension.toLowerCase()) || this.analysisInFlight
+      || view?.isWorkflowBusy() || (loaded && visible)) return false;
     menu.addItem((item) =>
       item
-        .setTitle("向当前文档提问")
-        .setIcon("message-circle-question")
+        .setTitle(loaded ? "打开当前文档的 AuxBrain" : "为当前文档载入AuxBrain")
+        .setIcon("file-input")
         .onClick(async () => {
-          await this.openCurrentDocumentQuestion();
+          const current = this.currentAuxBrainView();
+          if (current?.isWorkflowBusy()) { new Notice(current.workflowBusyMessage()); return; }
+          if (current?.hasDocumentContext(file.path)) {
+            this.activeDocument = file;
+            await this.activateView();
+          } else await this.openCurrentDocumentQuestion(file);
         })
     );
+    return true;
   }
 
   private addAnnotationMenuItem(
@@ -445,7 +453,7 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
     });
   }
 
-  private async openCurrentDocumentQuestion(): Promise<void> {
+  private async openCurrentDocumentQuestion(file?: TFile): Promise<void> {
     const currentView = this.currentAuxBrainView();
     if (currentView?.isWorkflowBusy()) {
       new Notice(currentView.workflowBusyMessage());
@@ -453,7 +461,7 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
     }
     new Notice("正在读取当前文档...");
     try {
-      await this.loadActiveDocument();
+      await this.loadActiveDocument(file);
     } catch (error) {
       await this.activateView();
       new Notice(`无法读取当前文档：${friendlyError(error)}`);
@@ -473,9 +481,49 @@ export default class AuxBrainPlugin extends Plugin implements AuxBrainViewHost {
     }
   }
 
+  private registerContextMenuDocument(doc?: Document): void {
+    if (!doc || this.unloaded || this.contextMenuDocuments.has(doc)) return;
+    this.contextMenuDocuments.add(doc);
+    const handler = (event: MouseEvent) => this.handleContextMenu(event);
+    doc.addEventListener("contextmenu", handler, { capture: true });
+    this.register(() => doc.removeEventListener("contextmenu", handler, { capture: true }));
+  }
+
+  private handleContextMenu(event: MouseEvent): void {
+    if (this.unloaded) return;
+    // Pop-out windows and SVG targets do not share the main window's HTMLElement constructor.
+    const target = (event.composedPath?.() ?? [event.target]).find(node =>
+      node && typeof (node as Element).closest === "function") as Element | undefined;
+    if (!target || this.isEditableTarget(target) || target.closest(".menu, .modal-container")) return;
+    const content = target.closest(".workspace-leaf-content");
+    const type = content?.getAttribute("data-type") ?? "";
+    const reader = ["pdf", "markdown"].includes(type);
+    const rightBlank = target.closest(".workspace-split.mod-right-split") &&
+      (!content || ["empty", "outline", "backlink", "outgoing-link", "tag", "all-properties"].includes(type));
+    if (!reader && type !== VIEW_TYPE_AUXBRAIN && !rightBlank) return;
+    const source = reader ? this.app.workspace.getLeavesOfType(type).find(leaf => leaf.view.containerEl.contains(target))?.view : null;
+    const file = source instanceof FileView ? source.file : this.currentDocumentFile();
+    const doc = target.ownerDocument ?? document;
+    const selected = reader ? (doc.defaultView?.getSelection() ?? window.getSelection?.()) : null;
+    const selection = selected && (!selected.anchorNode || content?.contains(selected.anchorNode)) ? selected.toString().trim() : "";
+    const menu = new Menu();
+    const added = this.addDocumentQuestionMenuItem(menu, file ?? undefined);
+    if (!added && !selection) return;
+    if (selection) this.addAnnotationMenuItem(menu, async () => selection, {
+      sourcePath: file?.path ?? "selection", title: file?.basename ?? "Obsidian selection"
+    });
+    try {
+      menu.showAtMouseEvent(event);
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    } catch (error) {
+      new Notice(`无法显示 AuxBrain 菜单：${friendlyError(error)}`);
+    }
+  }
+
   private isEditableTarget(target: EventTarget | null): boolean {
-    const element = target instanceof HTMLElement ? target : null;
-    if (!element) return false;
+    const element = target as Element | null;
+    if (!element || typeof element.closest !== "function") return false;
     return Boolean(
       element.closest("textarea, input, select, [contenteditable='true'], .cm-editor")
     );
@@ -546,7 +594,7 @@ class AuxBrainSettingTab extends PluginSettingTab {
       .setDesc("模式、供应商和模型在 AuxBrain 面板中直接选择。")
       .addButton((button) =>
         button
-          .setButtonText("管理 Key")
+          .setButtonText("管理密钥")
           .setIcon("key-round")
           .onClick(() => this.plugin.openLlmConfiguration())
       );
@@ -563,6 +611,14 @@ class AuxBrainSettingTab extends PluginSettingTab {
         this.plugin.settings.reviewer = value.trim() || DEFAULT_SETTINGS.reviewer;
         await this.plugin.saveSettings();
       })
+    );
+
+    new Setting(containerEl).setName("论文档案服务地址（可选）").addText((text) =>
+      text.setPlaceholder(this.plugin.settings.bridgeUrl)
+        .setValue(this.plugin.settings.dossierUrl ?? "").onChange(async (value) => {
+          this.plugin.settings.dossierUrl = value.trim();
+          await this.plugin.saveSettings();
+        })
     );
 
     const status = containerEl.createDiv({ cls: "fkms-settings-status" });

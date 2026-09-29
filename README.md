@@ -1,177 +1,206 @@
-# AuxBrain for Obsidian
+# AuxBrain
 
-AuxBrain helps researchers ask fine-grained questions about Markdown and PDF papers,
-inspect supporting evidence, and build a local human-reviewed knowledge graph.
+当前界面为中文版。参见 [0.19.2 中文使用说明](docs/0.19.2/README.md)。此版本仅准备测试分支和草稿 Release，不执行 Publish；草稿不通过 BRAT 自动分发。
 
-> [!IMPORTANT]
-> AuxBrain is currently distributed as a public beta through GitHub and BRAT. It is
-> not published in the official Obsidian Community directory. Plugin 0.9.1 uses a
-> separately distributed Windows x64 Companion to the GitHub release. The Companion
-> contains proprietary AuxBrain algorithms and is not open source.
+Ask fine-grained questions about PDF and Markdown papers, inspect original evidence,
+and progressively build a local, human-reviewed paper knowledge base.
 
-Plugin and Companion 0.9.1 integrate the shared AuxBrain question-answering engine
-and hierarchical evidence selector. First-use LLM setup and automatic paper
-switching remain available. Upgrade both components together.
+**Plugin 0.19.2 Beta targets Windows 10/11 x64 and Obsidian Desktop 1.5.0+.** Distribution
+is through GitHub/BRAT, not the official Community directory. Install both the plugin
+and Windows Companion 0.13.2 for the full feature set, including cross-segment source
+locations, cross-paper search and recorded usage. The original 0.11.2 binary does
+not provide these updates. The plugin is MIT-licensed; the separately
+distributed algorithm binary is proprietary. No Python or Conda is required.
 
-## Requirements
+## Download and Install
 
-- Obsidian Desktop 1.5.0 or later.
-- Windows 10 or 11 x64.
-- AuxBrain Companion 0.9.1 running on the same computer.
-- A DeepSeek API key or Volcengine Coding Plan API key.
+Use the [0.19.2 release page](https://github.com/asjmasjm/auxbrain/releases/tag/0.19.2)
+once published. The release assets, not GitHub's automatic source-code archive, are
+the installable distribution:
 
-The current release supports the official DeepSeek API and Volcengine Coding Plan.
-Support for additional LLM services is planned. API keys are sent only to the local
-loopback service and are not stored in the Obsidian plugin data file.
+- `main.js`, `manifest.json`, `styles.css`: plugin files.
+- `AuxBrain-Plugin-0.19.2.zip`: the same files in an `auxbrain` folder.
+- `AuxBrain-Companion-0.13.2-win-x64.zip`: updated Windows runtime; BRAT does not install it.
+- `AuxBrain-0.19.2-docs.zip`: this update and existing workflow documentation.
+- `SHA256SUMS.txt`: checksums for the release assets.
 
-## Beta installation
+For BRAT, add `https://github.com/asjmasjm/auxbrain`, select release `0.19.2`, and
+enable AuxBrain. For manual installation, place the three plugin files in
+`<vault>/.obsidian/plugins/auxbrain/`. Extract and run the Companion separately.
+Keep it running while using the plugin. **BRAT does not update the Companion.**
 
-### BRAT
+> Companion is an unsigned Beta. SmartScreen may warn. Check the release source and
+> SHA-256 before deciding whether to run it; do not globally disable security tools.
 
-1. Install and enable BRAT from Obsidian's Community plugins browser.
-2. Open **Settings -> BRAT -> Add beta plugin**.
-3. Enter `https://github.com/asjmasjm/auxbrain`.
-4. Choose release `0.9.1`, then install
-   and enable AuxBrain.
-5. Download [AuxBrain-Companion-0.9.1-win-x64.zip](https://github.com/asjmasjm/auxbrain/releases/download/0.9.1/AuxBrain-Companion-0.9.1-win-x64.zip).
-6. Verify its SHA-256, extract the ZIP, and run `AuxBrain-Companion.exe`.
+## Upgrade
 
-### Manual installation
+1. Wait for question and knowledge-write tasks to finish.
+2. Update the plugin to 0.19.2.
+3. Stop the idle Companion, back up the profile, install Companion 0.13.2, and
+   restart with the original profile or `--db` path. Do not run both on port 8795.
+4. In Settings > Community plugins, disable then enable
+   AuxBrain. Closing its sidebar alone does not reload plugin code.
 
-Copy these release assets into `<vault>/.obsidian/plugins/auxbrain/`:
+The plugin requires Companion 0.11.2 or later with API protocol 1. The packaged
+database schema is 3. First launch creates or migrates the local database; never
+delete the database to resolve a version mismatch.
 
-- `main.js`
-- `manifest.json`
-- `styles.css`
+Default endpoint: `http://127.0.0.1:8795`. Non-loopback service binds are refused.
+Default database: `%LOCALAPPDATA%\AuxBrain\profiles\default\auxbrain.sqlite`.
+`build-info.json` records the executable hash and backend source fingerprint.
 
-Restart Obsidian or disable and re-enable AuxBrain after replacing the files.
+## Read, Ask, Verify
 
-Then download the matching Companion ZIP from the
-[0.9.1 Beta release](https://github.com/asjmasjm/auxbrain/releases/tag/0.9.1),
-verify its SHA-256, extract it, and run `AuxBrain-Companion.exe`.
+1. Open a text-based PDF or Markdown file. On an unloaded document, right-click
+   **为当前文档载入AuxBrain**, use the ribbon icon, or run **向当前文档提问**.
+   Right-sidebar blank/outline areas and the file's native context menu also provide
+   entry. Sidebar focus at startup resolves the most recent reader. Once the current
+   paper is loaded and visible, the redundant load action is hidden. A hidden loaded
+   panel instead offers **打开当前文档的 AuxBrain**, preserving the existing answer.
+2. First use prompts for model setup. **回答模式** opens mode/provider/model settings.
+   **保存密钥** stores the key locally without a model request; **测试连接** is a
+   separate, explicit request which can consume quota.
+3. Enter a question or select a Chinese recommendation, then submit. Personal
+   question history is separate from recommendations and includes counts/times.
+4. Inspect the answer, confidence and token usage. Estimates are not final billing.
+5. Select **查看AuxBrain回答依据**. Evidence defaults to TOP-1; adjust TOP-N here,
+   then navigate to the original source and check the surrounding context.
+6. If the answer is correct, select **同意并入库** once. The displayed answer and
+   cited source evidence become human-confirmed knowledge, without rewriting or
+   automatically approving newly inferred graph relations. **我要修正** opens the
+   existing answer for editing; parse and inspect the proposed relations before
+   confirming. Returning without submission does not save or rate the answer.
+   **查看AuxBrain回答依据** only expands evidence; it does not write knowledge.
 
-### Upgrade
+Questions and foreground knowledge writes are mutually exclusive in the UI. While a
+task runs, switching papers is deferred; its result remains attached to its source.
+Scanned PDFs need an existing text layer/OCR. No visual table/image ingestion is promised.
 
-Update the plugin to 0.9.1 through BRAT or replace the three plugin files above.
-Stop the old Companion, back up the profile directory, extract the 0.9.1 ZIP, and
-start its executable. Older Companion versions are not compatible with this plugin.
-Keep using the same profile or `--db` path: existing personal data is retained and
-the database schema is upgraded automatically. BRAT updates only the plugin;
-the Companion must be updated separately.
+## Modes and Progress
 
-`build-info.json` in the ZIP records the build time, backend source revision,
-whether local changes were included, a source fingerprint, and the executable hash.
-Companion 0.9.1 is rebuilt from the updated backend, not a renamed older binary.
+- **AuxBrain**: hierarchical evidence selection, LLM synthesis and evidence checks;
+  a question can make several model requests.
+- **仅 LLM**: LLM answering without the AuxBrain correction stage.
 
-## Local service
+The selection stage is labeled **AuxBrain+LLM协同**. Its per-round timing details
+are hidden; the stage's elapsed time, activity indicator and overall elapsed time
+remain visible. Backend telemetry is unchanged. These timings do not expose model
+reasoning or promise lower latency. Tokens accumulate when available; live values
+can be estimates.
 
-The portable Companion does not require Python or Conda. Keep its console window open
-while using the plugin; close the window or press `Ctrl+C` to stop it. The default
-endpoint is `http://127.0.0.1:8795`, and the service refuses non-loopback bind
-addresses.
+## Progressive Paper Cards
 
-> [!WARNING]
-> Companion 0.9.1 Beta is not code-signed. Microsoft Defender SmartScreen may warn
-> before first launch. Download it only from the official AuxBrain GitHub release and
-> compare its SHA-256 with `SHA256SUMS.txt`. Do not disable SmartScreen or antivirus
-> globally. Proceed only when the source and hash match.
+**查看数据库** opens a paper-card library, with a legacy graph entry retained.
+Each paper offers basic metadata, structured knowledge and question contributions.
+The eight knowledge sections cover background, related work, improvements, method,
+experiment setup, results, ablations and limitations/future work.
 
-On Windows, the default personal database is stored at:
+Questions gradually contribute candidate knowledge and source evidence. Candidate
+status is not human approval. The system can reuse confirmed knowledge from the
+same paper version; retracted or outdated records are excluded. Disclosure counts
+measure recorded section coverage, not a scientific completeness score. The
+**档案关联提问** count is not necessarily the entire historical question count.
 
-```text
-%LOCALAPPDATA%\AuxBrain\profiles\default\auxbrain.sqlite
-```
+Cards now show **已提问 n 次，m 条知识待入库确认** using dossier-linked counts.
+In a paper detail, **查看本篇论文知识图谱** shows only that work's confirmed entity
+relations. The library list separately offers **查看全部论文知识图谱**. A paper
+without entity relations stays empty, even if it already has narrative knowledge.
 
-The database and schema are created or upgraded automatically on launch. Each user keeps a
-separate local knowledge base containing papers, entities, reviewed relations, rejected
-suggestions, question history, and model provenance.
+In a paper, **查看原文依据** opens an available source passage. **关联本地原文**
+is shown for items needing source-location association. File/text checks must pass
+before a location is persisted. Changed source text or ambiguous repeated matches
+must not be treated as a successful highlight. Basic metadata only shows recorded
+fields; author affiliations and publication timelines are not silently fabricated.
 
-## Privacy and network access
+Source binding now shows progress, a persistent result and a notification. Success
+requires a readback of the clicked evidence's unique location, including later
+knowledge pages. Missing, ambiguous or changed sources are not reported as success.
+**重新核对结果** only reads the latest state and never repeats the binding write.
+**跳转已关联原文** remains subject to local snapshot verification.
+Companion 0.13.2 also locates quotes spanning adjacent saved segments. Cross-page
+PDF evidence opens the first page and shows the page range; only a unique available
+first-page passage is highlighted, not the entire multi-page quote.
 
-- The plugin connects to the configured companion-service URL, which defaults to the
-  local loopback address `http://127.0.0.1:8795`.
-- Questions, selected passages, document text needed for evidence retrieval, provider
-  settings, and API credentials are sent to that companion service for processing.
-- In LLM modes, the companion service sends the required prompt context to the selected
-  DeepSeek or Volcengine service and uses the supplied API key to authenticate there.
-- The companion service creates and accesses the personal SQLite knowledge base outside
-  the Obsidian vault so knowledge can remain local to the user's computer.
-- AuxBrain does not include client-side telemetry or advertising.
+Literal excerpts are labeled **待整理的原文** (or **保存的原文** for existing records),
+not summaries or conclusions. Only a short source preview appears until expanded.
+**写下我的理解** opens the source and one empty interpretation field directly.
+**保存修正** stores the interpretation locally as a pending-review replacement,
+preserving source and history. It does not automatically approve it.
+An actual claim is labeled **知识结论**. **核对结论** offers **同意并入库** or
+**我要修正** at the top. Agreement saves explicit human approval in one click;
+there is no second confirmation page. Check the wording, relation direction and conditions.
+Raw excerpts no longer offer confirmation as a conclusion. Existing records are
+not migrated or silently modified. No extra cloud model calls are introduced.
 
-## Usage
+**提问贡献** shows the question, time and concise changes grouped by section, not
+full English source paragraphs in buttons. Open the section to inspect its knowledge
+and evidence. The interpretation form no longer asks for JSON; empty conditions are
+hidden, and existing structured conditions are shown as read-only Chinese fields.
+Free-text corrections invalidate the old relation fields rather than displaying an
+unverified old edge beside new wording. Other conditions and original evidence remain.
+Saving/confirming a narrative knowledge item does not itself create entity graph edges.
+Directly approved answers are labeled **用户认可的回答** and need no second card
+confirmation or interpretation. The save action becomes **已同意入库** and the next
+action **查看知识** opens its paper. Derived candidates remain separately reviewed.
 
-When you first open AuxBrain without a configured API Key, it opens the LLM setup
-dialog. Select a provider and model, then configure and test your key. Dismissing
-the dialog leaves a setup action in the panel. If the Companion is not running,
-start it and use the reconnect button to continue setup.
+Structured relations are shown as subject, a Chinese-labeled directional edge, and
+object on cards and in review. Expanding answer evidence also reads relations linked
+to that exact saved question, across contribution pages. It does not extract new
+relations or use shared keywords as proof. Text-only knowledge is explicitly labeled;
+backend structured extraction is still required for such answers.
 
-The panel follows the active Markdown or PDF tab, loading the corresponding title
-and question history automatically. While an answer or knowledge write is running,
-the current paper stays attached to that task; the panel switches to the most recently
-opened paper when the task finishes. Returning focus to the same paper keeps the
-current question or annotation.
+Direct approval requires Companion 0.13.2 with `answer_approval_version=1`; old
+services disable this action without falling back to the legacy auto-relation
+promotion endpoint. Uncertain requests retry with the same operation key. No model
+request is made by direct approval. Missing cited evidence or changed paper versions
+are not reported as successful approval.
 
-1. Open a Markdown note or PDF paper.
-2. Click the AuxBrain ribbon icon, run `向当前文档提问`, or right-click and choose the
-   same command.
-3. Enter a question or choose one of the bilingual recommended questions.
-4. Review the answer, confidence, token usage, and processing stages.
-5. Select `查看AuxBrain回答依据` to inspect the top supporting passage and navigate
-   back to the source location.
-6. Use thumbs-up to accept the answer and write its evidence-bound relations into the
-   personal knowledge base.
-7. Select `我要修正` to enter the human-in-the-loop correction workflow.
+## Providers, Privacy and Costs
 
-To annotate directly, select text and choose `加入 AuxBrain` from the context menu.
+**跨论文知识检索** is a submit-only local search over confirmed paper knowledge,
+with source evidence, scope and backend pagination totals. Shared terms never become
+new entity relations. Paper details include a collapsed **用量** region; recorded
+tokens are not a complete bill, missing usage is not zero cost, and reuse counts
+are not money saved. Unsupported services disable the respective feature until
+updated. Background `reused_build` completion displays **已复用整理结果** without
+changing existing retry/new-question request keys.
 
-Answer generation and knowledge writes are mutually exclusive in this release. While
-one operation is active, AuxBrain disables commands that could replace the current
-document or start the other operation.
+The adapters offer DeepSeek's official API, Volcengine Coding Plan and an optional
+Tencent Token Plan integration. Available options are not authorization to use a
+subscription for this workload. Read the in-app **声明** and
+[provider usage notes](PROVIDER-USAGE.md), including Tencent restrictions and the
+unconfirmed Coding Plan scope, before selecting a service.
 
-## Answer modes
+Keys are kept by the local credential service, not in plugin `data.json`. Questions
+and required paper context are sent to the selected cloud model. A local database
+does not mean LLM processing is offline. Connection tests can consume quota.
+There is no silent switch to another provider or pay-as-you-go endpoint.
 
-- `AuxBrain`: uses the shared hierarchical evidence selector, LLM answer synthesis,
-  and evidence-confidence checks. A single question may make multiple model requests;
-  available token usage is accumulated across those requests.
-- `LLM-Only`: uses the selected LLM without AuxBrain correction or algorithm fallback.
+The default background dossier worker extracts candidates locally. The separate
+`--dossier-llm` option enables DeepSeek background organization/auditing and needs
+separate permission; it does not follow the foreground provider dropdown. This
+release does not enable it automatically. Never publish keys, personal DBs or private
+paper/history screenshots. No telemetry or advertising is included.
 
-Mode, provider, and model are configured from **回答模式**. The information button in
-that dialog shows the currently supported LLM services. The API Key screen includes a
-back action that returns to the answer-mode dialog.
+## Documentation and Development
 
-Each question indexes the current document in a temporary local database, which is
-removed after the request. This release does not merge previously reviewed knowledge
-into that temporary question index. Question history remains in the personal database;
-only explicit acceptance or correction writes reviewed relations there. PDF evidence
-retains its original page and text position for navigation and highlighting.
-
-## Development
+Read the [0.19.2 contribution and confirmation update](docs/0.19.2/README.md) and
+[0.15.2 knowledge search and usage update](docs/0.15.2/README.md). The
+[0.11.2 workflow guide](docs/0.11.2/00-文档导航.md) still covers evidence/card usage,
+version verification, provider notes and troubleshooting. Old-version screenshots
+are not presented as new-version captures. Tests with fake models are not live-provider
+certification. See [CHANGELOG](CHANGELOG.md) for changes.
 
 ```powershell
 conda activate obsidian
 npm ci
+npm test
 npm run validate:release
 ```
 
-`npm run validate:release` type-checks and builds the plugin, then verifies the manifest,
-version mapping, plugin ID, desktop requirement, and release assets.
-
-## Release
-
-1. Update `manifest.json`, `package.json`, `package-lock.json`, and `versions.json` to
-   the same three-part version.
-2. Run `npm run validate:release`.
-3. Commit and push the source to a public GitHub repository.
-4. Create and push a tag matching `manifest.json` exactly, without a `v` prefix.
-5. The GitHub Actions workflow creates a draft release containing `main.js`,
-   `manifest.json`, and `styles.css`.
-6. Build and validate the proprietary Companion outside this public repository, then
-   upload its ZIP and `SHA256SUMS.txt` to the draft release.
-7. Review the notes and publish the GitHub release. This Beta is currently distributed
-   through GitHub and BRAT, not the official Obsidian Community directory.
-
-## Licenses
-
-The Obsidian plugin source in this repository is licensed under the MIT License. The
-separately downloaded AuxBrain Companion is proprietary and includes its own binary
-notice and third-party runtime licenses in the ZIP.
+Follow [VERSIONING.md](VERSIONING.md): major feature iterations increment the second
+component; small features, fixes and recompilation increment the third. Release tags match the manifest
+exactly (`0.19.2`, no `v` prefix). The GitHub workflow
+builds a draft with the three plugin assets; the validated Companion, guide and
+checksums are attached separately. Publishing the Beta does not submit it to the
+official Community directory. Backend source and user data stay outside this repo.

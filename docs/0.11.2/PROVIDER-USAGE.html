@@ -1,0 +1,116 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PROVIDER-USAGE</title><style>
+:root { color-scheme: light; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }
+body { margin: 0; color: #19252d; background: #fff; line-height: 1.8; }
+main { max-width: 1160px; margin: 0 auto; padding: 32px 28px 72px; }
+h1 { font-size: 28px; border-bottom: 3px solid #169cb5; padding-bottom: 16px; }
+h2 { font-size: 23px; margin-top: 40px; border-top: 1px solid #dce4e7; padding-top: 24px; }
+h3 { font-size: 18px; }
+a { color: #007c99; overflow-wrap: anywhere; }
+p, li, td, th { overflow-wrap: anywhere; }
+img { display: block; max-width: 100%; height: auto; border: 1px solid #dce4e7; margin: 18px 0 8px; }
+blockquote { margin: 20px 0; padding: 10px 18px; border-left: 4px solid #169cb5; background: #f1f8fa; }
+blockquote p { margin: 4px 0; }
+pre { padding: 14px 18px; background: #f3f5f6; overflow-x: auto; }
+code { font-family: Consolas, monospace; font-size: 0.94em; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+td, th { padding: 10px; text-align: left; border: 1px solid #dce4e7; }
+th { background: #eff5f7; }
+em { color: #556570; }
+nav { border-bottom: 1px solid #dce4e7; padding-bottom: 12px; font-size: 14px; }
+@media(max-width: 600px) { main { padding: 18px 14px 40px; } h1 { font-size: 24px; } table { font-size: 12px; } td,th { padding: 6px; } }
+@media print { main { max-width: none; padding: 0; } h2 { break-after: avoid; } img { break-inside: avoid; } nav { display: none; } }
+</style></head><body><main><nav><a href="00-文档导航.html">文档导航</a> | <a href="01-安装与升级.html">安装与升级</a> | <a href="02-使用教程.html">使用教程</a> | <a href="03-个人论文知识库.html">个人论文知识库</a> | <a href="04-版本核对与故障排查.html">版本核对与故障排查</a> | <a href="05-服务商与隐私.html">服务商与隐私</a> | <a href="06-更新说明.html">更新说明</a> | <a href="PROVIDER-USAGE.html">PROVIDER-USAGE</a></nav><h1>LLM provider usage and billing</h1>
+<p>Technical documentation updated for 0.11.2 on 2026-09-29. The provider-policy review
+below is dated 2026-09-28; it has not been represented as a new legal review. This
+note is not legal advice or a provider's authorization. Save/test separation, the
+optional Tencent adapter and the declaration dialog are included in the 0.11.2 build.</p>
+<h2>Providers</h2>
+<ul>
+<li><strong>DeepSeek official API:</strong> its <a href="https://cdn.deepseek.com/policies/zh-CN/deepseek-open-platform-terms-of-service.html">Open Platform terms</a>
+allow downstream applications. Users still need to comply with the agreement,
+content/data requirements, and account billing rules.</li>
+<li><strong>Volcengine Coding Plan:</strong> AuxBrain has a working adapter, but the plan's scope
+for paper QA, human annotation, and unattended background organization remains
+unconfirmed. Review the <a href="https://docs.volcengine.com/docs/ark/coding-plan-personal-plan-overview?lang=zh">official plan documentation</a>
+and obtain confirmation from Volcengine support before relying on this use case.
+Do not interpret successful authentication as authorization for the workload.</li>
+<li><strong>Tencent Token Plan:</strong> an optional adapter is available. Its <a href="https://cloud.tencent.com/document/product/1823/130060">personal plan rules</a>
+explicitly prohibit custom application backends, automated scripts and non-interactive
+batch calls. AuxBrain uses a local Companion backend; do not assume it qualifies as
+an approved tool. Obtain Tencent authorization for this workflow before using the
+plan here. A declaration or user choice does not override those rules. Violations
+can lead to subscription suspension or key revocation. This is not the ordinary
+TokenHub pay-as-you-go API, and the adapters do not silently switch to it.</li>
+</ul>
+<p>The foreground adapters use these distinct endpoints:</p>
+<table>
+<thead>
+<tr>
+<th>Adapter</th>
+<th>Endpoint</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DeepSeek</td>
+<td><code>https://api.deepseek.com/chat/completions</code></td>
+</tr>
+<tr>
+<td>Volcengine Coding Plan</td>
+<td><code>https://ark.cn-beijing.volces.com/api/coding/v3/chat/completions</code></td>
+</tr>
+<tr>
+<td>Tencent Token Plan</td>
+<td><code>https://api.lkeap.cloud.tencent.com/plan/v3/chat/completions</code></td>
+</tr>
+</tbody>
+</table>
+<p>A missing key or unsupported provider does not cause a cross-provider fallback.
+The Coding Plan adapter does not silently switch to the regular postpaid Ark API.
+The <code>ark-code-latest</code> option deliberately lets the provider route within its plan;
+it is not a guarantee of a fixed underlying model. A question in AuxBrain mode can
+make multiple requests, and retries/new tests can also consume quota.</p>
+<h2>Key setup</h2>
+<ol>
+<li>Choose the answer mode, provider, and model in the answer-mode dialog. Open
+<strong>Declaration</strong> (<code>声明</code>) for all three providers' scope, quota and privacy notes.
+Closing the declaration returns to the unchanged selection; it is not a waiver
+or a provider approval. Tencent restrictions also remain visible in its settings.</li>
+<li>Open Key configuration and select <strong>Save Key</strong> (<code>保存 Key</code>). This only stores
+the credential through the local Companion; it does not test the model.</li>
+<li>Optionally select <strong>Test connection</strong> (<code>测试连接</code>). This sends a short synthetic
+prompt to the selected provider and may consume quota. It sends no paper text.</li>
+<li>Use the upper-left back action to return. Connection failure does not delete
+the saved key or switch providers. Unsaved replacement input disables testing
+until saved or cleared, so an old credential is not tested by mistake.</li>
+</ol>
+<p>Each user supplies their own key. Never include keys in releases, screenshots,
+support logs, or source control. Revoke a key that has been publicly exposed.
+The UI redacts common credential patterns in formatted errors, but this is not a
+guarantee that all third-party logs or arbitrary secret formats are sanitized.</p>
+<p>Tencent keys use a separate Windows credential target, <code>AuxBrain/Tencent Token Plan API Key</code>, or the <code>TENCENT_TOKEN_PLAN_API_KEY</code> environment variable. No existing
+credential is copied or reused. The default foreground provider remains unchanged.
+Tencent selection includes DeepSeek V4 Flash/Pro, GLM 5.2/5.3/5.3 Flash, Kimi K2.7
+Code/K3, MiniMax M2.7/M3, Hy4 preview, Hy3 and Auto. Hy3 requires the corresponding
+Hy plan. Model availability depends on the user's subscription and current official
+catalog; no subscription is purchased automatically. Auto (<code>tc-code-latest</code>) is
+provider-side routing, not a fixed underlying model.</p>
+<p>Tencent JSON extraction uses prompt-level JSON output for multi-model compatibility.
+Streaming and usage parsing have offline test coverage; live model compatibility has
+not been established by these tests. Unsupported model parameters or account-specific
+restrictions fail visibly, without another provider or a paid-endpoint retry.</p>
+<h2>Foreground versus background</h2>
+<p>The selected foreground provider receives the relevant question and paper context.
+A local database does not imply that all processing stays offline.</p>
+<p>The backend's default dossier worker creates excerpt candidates offline.
+The separate <strong><code>--dossier-llm</code></strong> switch enables DeepSeek Flash background organization
+and evidence auditing, sending bounded question/answer/evidence context to DeepSeek.
+It is <strong>not controlled by the foreground provider dropdown</strong> and requires separate
+user permission. Updating to 0.11.2 does not enable it automatically.</p>
+<h2>Remaining confirmation</h2>
+<p>Ask Volcengine whether a local Obsidian research plugin may use the personal Coding
+Plan for interactive paper QA, evidence extraction/HIL, and optional unattended
+knowledge organization. Ask about each workload, permitted clients, and applicable
+limits. Until clarified, do not assume the plan covers them or migrate to a paid
+endpoint without the user's approval.</p>
+</main></body></html>

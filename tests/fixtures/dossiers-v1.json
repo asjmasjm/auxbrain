@@ -1,0 +1,460 @@
+{
+  "synthetic_test_only": true,
+  "work_id": "work_4254a731aede40fd8ff77945e4a61b84",
+  "responses": {
+    "/api/v1/dossiers?q=&offset=0&limit=24": {
+      "status": 200,
+      "json": {
+        "works": [
+          {
+            "work_id": "work_0aeae9a34b6c481eb4cb3a08c4ff2297",
+            "metadata": {},
+            "revision": 1,
+            "created_at": "2026-09-27 16:02:43",
+            "aliases": [
+              "paper:test-b"
+            ],
+            "sources": [
+              {
+                "paper_id": "test-b",
+                "title": "Synthetic same-title paper",
+                "source_uri": "obsidian://test-b.pdf",
+                "authors": [],
+                "publication_date": null,
+                "arxiv_version": ""
+              }
+            ],
+            "title": "Synthetic same-title paper",
+            "publication": {
+              "status": "unverified"
+            },
+            "sections": [
+              {
+                "section": "background",
+                "state": "unexplored",
+                "counts": {},
+                "disclosed": 0
+              },
+              {
+                "section": "related_work",
+                "state": "unexplored",
+                "counts": {},
+                "disclosed": 0
+              },
+              {
+                "section": "improvements",
+                "state": "unexplored",
+                "counts": {},
+                "disclosed": 0
+              },
+              {
+                "section": "method",
+                "state": "unexplored",
+                "counts": {},
+                "disclosed": 0
+              },
+              {
+                "section": "experiment_setup",
+                "state": "unexplored",
+                "counts": {},
+                "disclosed": 0
+              },
+              {
+                "section": "results",
+                "state": "unexplored",
+                "counts": {},
+                "disclosed": 0
+              },
+              {
+                "section": "ablations",
+                "state": "unexplored",
+                "counts": {},
+                "disclosed": 0
+              },
+              {
+                "section": "limitations_future_work",
+                "state": "unexplored",
+                "counts": {},
+                "disclosed": 0
+              }
+            ],
+            "counts": {},
+            "confirmed_by_kind": {},
+            "confirmed_by_origin": {},
+            "explored_sections": 0,
+            "total_sections": 8
+          },
+          {
+            "work_id": "work_4254a731aede40fd8ff77945e4a61b84",
+            "metadata": {
+              "authors": {
+                "source_uri": "obsidian://test-a.pdf",
+                "value": [
+                  {
+                    "affiliations": [
+                      "Synthetic Lab"
+                    ],
+                    "name": "Test Author"
+                  }
+                ]
+              },
+              "official_versions": {
+                "source_uri": "https://example.org/test",
+                "value": [
+                  {
+                    "source_uri": "https://example.org/test",
+                    "submitted_at": "2026-09-01",
+                    "version": "v1"
+                  }
+                ]
+              }
+            },
+            "revision": 2,
+            "created_at": "2026-09-27 16:02:43",
+            "aliases": [
+              "paper:test-a"
+            ],
+            "sources": [
+              {
+                "paper_id": "test-a",
+                "title": "Synthetic same-title paper",
+                "source_uri": "obsidian://test-a.pdf",
+                "authors": [],
+                "publication_date": null,
+                "arxiv_version": ""
+              }
+            ],
+            "title": "Synthetic same-title paper",
+            "publication": {
+              "status": "unverified"
+            },
+            "sections": [
+              {
+                "section": "background",
+                "state": "unexplored",
+                "counts": {},
+                "disclosed": 0
+              },
+              {
+                "section": "related_work",
+                "state": "unexplored",
+                "counts": {},
+                "disclosed": 0
+              },
+              {
+                "section": "improvements",
+                "state": "unexplored",
+                "counts": {},
+                "disclosed": 0
+              },
+              {
+                "section": "method",
+                "state": "partially_confirmed",
+                "counts": {
+                  "candidate": 1,
+                  "confirmed": 1
+                },
+                "disclosed": 1
+              },
+              {
+                "section": "experiment_setup",
+                "state": "candidate",
+                "counts": {
+                  "candidate": 1
+                },
+                "disclosed": 1
+              },
+              {
+                "section": "results",
+                "state": "unexplored",
+                "counts": {},
+                "disclosed": 0
+              },
+              {
+                "section": "ablations",
+                "state": "unexplored",
+                "counts": {},
+                "disclosed": 0
+              },
+              {
+                "section": "limitations_future_work",
+                "state": "unexplored",
+                "counts": {},
+                "disclosed": 0
+              }
+            ],
+            "counts": {
+              "candidate": 2,
+              "confirmed": 1
+            },
+            "confirmed_by_kind": {
+              "paper_statement": 1
+            },
+            "confirmed_by_origin": {
+              "human": 1
+            },
+            "explored_sections": 2,
+            "total_sections": 8
+          }
+        ],
+        "total": 2,
+        "limit": 24,
+        "offset": 0
+      }
+    },
+    "/api/v1/dossiers/work_4254a731aede40fd8ff77945e4a61b84": {
+      "status": 200,
+      "json": {
+        "work_id": "work_4254a731aede40fd8ff77945e4a61b84",
+        "metadata": {
+          "authors": {
+            "source_uri": "obsidian://test-a.pdf",
+            "value": [
+              {
+                "affiliations": [
+                  "Synthetic Lab"
+                ],
+                "name": "Test Author"
+              }
+            ]
+          },
+          "official_versions": {
+            "source_uri": "https://example.org/test",
+            "value": [
+              {
+                "source_uri": "https://example.org/test",
+                "submitted_at": "2026-09-01",
+                "version": "v1"
+              }
+            ]
+          }
+        },
+        "revision": 2,
+        "created_at": "2026-09-27 16:02:43",
+        "aliases": [
+          "paper:test-a"
+        ],
+        "sources": [
+          {
+            "paper_id": "test-a",
+            "title": "Synthetic same-title paper",
+            "source_uri": "obsidian://test-a.pdf",
+            "authors": [],
+            "publication_date": null,
+            "arxiv_version": ""
+          }
+        ],
+        "title": "Synthetic same-title paper",
+        "publication": {
+          "status": "unverified"
+        },
+        "sections": [
+          {
+            "section": "background",
+            "state": "unexplored",
+            "counts": {},
+            "disclosed": 0
+          },
+          {
+            "section": "related_work",
+            "state": "unexplored",
+            "counts": {},
+            "disclosed": 0
+          },
+          {
+            "section": "improvements",
+            "state": "unexplored",
+            "counts": {},
+            "disclosed": 0
+          },
+          {
+            "section": "method",
+            "state": "partially_confirmed",
+            "counts": {
+              "candidate": 1,
+              "confirmed": 1
+            },
+            "disclosed": 1
+          },
+          {
+            "section": "experiment_setup",
+            "state": "candidate",
+            "counts": {
+              "candidate": 1
+            },
+            "disclosed": 1
+          },
+          {
+            "section": "results",
+            "state": "unexplored",
+            "counts": {},
+            "disclosed": 0
+          },
+          {
+            "section": "ablations",
+            "state": "unexplored",
+            "counts": {},
+            "disclosed": 0
+          },
+          {
+            "section": "limitations_future_work",
+            "state": "unexplored",
+            "counts": {},
+            "disclosed": 0
+          }
+        ],
+        "counts": {
+          "candidate": 2,
+          "confirmed": 1
+        },
+        "confirmed_by_kind": {
+          "paper_statement": 1
+        },
+        "confirmed_by_origin": {
+          "human": 1
+        },
+        "explored_sections": 2,
+        "total_sections": 8
+      }
+    },
+    "/api/v1/dossiers/work_4254a731aede40fd8ff77945e4a61b84/items?limit=100&offset=0": {
+      "status": 200,
+      "json": {
+        "items": [
+          {
+            "item_id": "knowledge_0b0586cf7ddc4f8089a720a355e03e03",
+            "work_id": "work_4254a731aede40fd8ff77945e4a61b84",
+            "paper_id": "test-a",
+            "section": "method",
+            "statement": "# Method\nWe train the synthetic policy on test demonstrations.",
+            "scope": {},
+            "kind": "paper_statement",
+            "status": "candidate",
+            "fingerprint": "dd7c6c5b2b5d17f945cd6e548185d583b27989bc05377a409e8e17f9a8d9a26f",
+            "source_hash": "2b5daa2ea4d48cb3fa51381c39d2e1adf83eac0659a7c9d9f13b26eb5021fc29",
+            "revision": 1,
+            "review_origin": "",
+            "created_at": "2026-09-27 16:02:43",
+            "effective_status": "candidate",
+            "evidence": [
+              {
+                "paper_id": "test-a",
+                "paragraph_hash": "75c32ae38b5315bfe8cfe6e74f4cf77183af5882a6bfcb2a5a3676e0959717fc",
+                "paragraph_id": "paragraph_1b124c932e5625e4",
+                "quote": "# Method\nWe train the synthetic policy on test demonstrations.",
+                "section_title": "Method"
+              }
+            ]
+          },
+          {
+            "item_id": "knowledge_4c736dbf8e834c8cabed257e59776bed",
+            "work_id": "work_4254a731aede40fd8ff77945e4a61b84",
+            "paper_id": "test-a",
+            "section": "method",
+            "statement": "Synthetic policy uses test demonstrations.",
+            "scope": {},
+            "kind": "paper_statement",
+            "status": "confirmed",
+            "fingerprint": "b95e8c017f194d9b2d674508c40ea6acbc0ccf7ce0d22313ceb1abe532850325",
+            "source_hash": "2b5daa2ea4d48cb3fa51381c39d2e1adf83eac0659a7c9d9f13b26eb5021fc29",
+            "revision": 2,
+            "review_origin": "human",
+            "created_at": "2026-09-27 16:02:43",
+            "effective_status": "confirmed",
+            "evidence": [
+              {
+                "paper_id": "test-a",
+                "paragraph_hash": "75c32ae38b5315bfe8cfe6e74f4cf77183af5882a6bfcb2a5a3676e0959717fc",
+                "paragraph_id": "paragraph_1b124c932e5625e4",
+                "quote": "# Method\nWe train the synthetic policy on test demonstrations.",
+                "section_title": "Method"
+              }
+            ]
+          },
+          {
+            "item_id": "knowledge_e8e751aad5ad42efad0a2e769a27e4c0",
+            "work_id": "work_4254a731aede40fd8ff77945e4a61b84",
+            "paper_id": "test-a",
+            "section": "experiment_setup",
+            "statement": "# Experiments\nWe evaluate on the synthetic test platform.",
+            "scope": {},
+            "kind": "paper_statement",
+            "status": "candidate",
+            "fingerprint": "444b47781bdf31fa35612489c8024756928902e8cdf0eab7d552d35cf7136dd4",
+            "source_hash": "2b5daa2ea4d48cb3fa51381c39d2e1adf83eac0659a7c9d9f13b26eb5021fc29",
+            "revision": 1,
+            "review_origin": "",
+            "created_at": "2026-09-27 16:02:43",
+            "effective_status": "candidate",
+            "evidence": [
+              {
+                "paper_id": "test-a",
+                "paragraph_hash": "6d7a1e027c21ea7106bc8b836ed78a14eab38dbd743900ded69caebcc832372a",
+                "paragraph_id": "paragraph_b58f96594f9dd132",
+                "quote": "# Experiments\nWe evaluate on the synthetic test platform.",
+                "section_title": "Experiments"
+              }
+            ]
+          }
+        ],
+        "total": 3,
+        "limit": 100,
+        "offset": 0
+      }
+    },
+    "/api/v1/dossiers/work_4254a731aede40fd8ff77945e4a61b84/contributions?limit=20&offset=0": {
+      "status": 200,
+      "json": {
+        "questions": [
+          {
+            "question_id": "question_6e8afef5340d4494961c2bc62be15770",
+            "question": "How is the test policy trained?",
+            "source_question_id": "",
+            "created_at": "2026-09-27 16:02:43",
+            "events": [
+              {
+                "event_id": 3,
+                "item_id": "knowledge_0b0586cf7ddc4f8089a720a355e03e03",
+                "kind": "added",
+                "actor": "automatic",
+                "detail": {},
+                "created_at": "2026-09-27 16:02:43"
+              },
+              {
+                "event_id": 4,
+                "item_id": "knowledge_0b0586cf7ddc4f8089a720a355e03e03",
+                "kind": "first_revealed",
+                "actor": "automatic",
+                "detail": {},
+                "created_at": "2026-09-27 16:02:43"
+              },
+              {
+                "event_id": 5,
+                "item_id": "knowledge_e8e751aad5ad42efad0a2e769a27e4c0",
+                "kind": "added",
+                "actor": "automatic",
+                "detail": {},
+                "created_at": "2026-09-27 16:02:43"
+              },
+              {
+                "event_id": 6,
+                "item_id": "knowledge_e8e751aad5ad42efad0a2e769a27e4c0",
+                "kind": "first_revealed",
+                "actor": "automatic",
+                "detail": {},
+                "created_at": "2026-09-27 16:02:43"
+              }
+            ],
+            "changes": {
+              "added": 2,
+              "first_revealed": 2
+            }
+          }
+        ],
+        "total": 1,
+        "limit": 20,
+        "offset": 0
+      }
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import { App, Modal, Notice, Setting, setIcon } from "obsidian";
+import { ProviderDeclarationModal, renderProviderNotice } from "./provider-notice";
 
 import {
   AnalysisMode,
@@ -24,7 +25,6 @@ export class RuntimeConfigurationModal extends Modal {
   private mode: AnalysisMode;
   private provider: LlmProvider;
   private model: string;
-  private showProviderNote = false;
 
   constructor(
     app: App,
@@ -57,31 +57,20 @@ export class RuntimeConfigurationModal extends Modal {
     const heading = contentEl.createDiv({ cls: "fkms-modal-heading" });
     heading.createEl("h2", { text: this.firstUse ? "首次使用 · 设置 LLM" : "回答模式" });
     const info = heading.createEl("button", {
-      cls: "clickable-icon fkms-modal-info",
+      cls: "fkms-modal-info",
       attr: {
         type: "button",
-        "aria-label": "LLM 服务支持说明",
-        "aria-expanded": String(this.showProviderNote),
+        "aria-label": "LLM 接入声明",
         "data-tooltip-position": "left"
       }
     });
-    setIcon(info, "info");
-    info.onclick = () => {
-      this.showProviderNote = !this.showProviderNote;
-      this.renderForm();
-    };
-    if (this.showProviderNote) {
-      const note = contentEl.createDiv({ cls: "fkms-provider-note" });
-      const noteIcon = note.createSpan({ cls: "fkms-provider-note-icon" });
-      setIcon(noteIcon, "info");
-      note.createSpan({
-        text: "目前仅支持 DeepSeek 官网 API 和火山引擎 Coding Plan，更多 LLM 服务有待支持。"
-      });
-    }
+    setIcon(info.createSpan({ cls: "fkms-button-icon" }), "info");
+    info.createSpan({ text: "声明" });
+    info.onclick = () => new ProviderDeclarationModal(this.app, this.provider).open();
 
     new Setting(contentEl)
       .setName("分析方式")
-      .setDesc("LLM-Only 直接回答；AuxBrain 会进一步校正证据与置信度。")
+      .setDesc("仅 LLM 直接回答；AuxBrain 会进一步校正证据与置信度。")
       .addDropdown((dropdown) =>
         dropdown
           .addOption("llm", labelMode("llm"))
@@ -104,9 +93,12 @@ export class RuntimeConfigurationModal extends Modal {
             findLlmProvider(this.config, this.provider)?.default_model ?? "";
           this.renderForm();
         });
-      });
+      })
+      .addExtraButton((button) => button.setIcon("info").setTooltip("LLM 接入声明")
+        .onClick(() => new ProviderDeclarationModal(this.app, this.provider).open()));
 
     const provider = findLlmProvider(this.config, this.provider);
+    if (this.provider !== "deepseek") renderProviderNotice(contentEl, this.provider);
     new Setting(contentEl)
       .setName("模型")
       .addDropdown((dropdown) => {
@@ -122,7 +114,7 @@ export class RuntimeConfigurationModal extends Modal {
     status.dataset.state = provider?.configured ? "ok" : "warning";
     status.createSpan({ cls: "fkms-status-dot" });
     status.createSpan({
-      text: provider?.configured ? "API Key 已配置" : "需要配置 API Key"
+      text: provider?.configured ? "接口密钥 已配置" : "需要配置 接口密钥"
     });
 
     const actions = contentEl.createDiv({ cls: "fkms-modal-actions" });
@@ -131,7 +123,7 @@ export class RuntimeConfigurationModal extends Modal {
     });
     const keyIcon = keyButton.createSpan({ cls: "fkms-button-icon" });
     setIcon(keyIcon, "key-round");
-    keyButton.createSpan({ text: provider?.configured ? "更新 Key" : "配置 Key" });
+    keyButton.createSpan({ text: provider?.configured ? "更新密钥" : "配置密钥" });
     keyButton.onclick = async () => {
       keyButton.disabled = true;
       save.disabled = true;

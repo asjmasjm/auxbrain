@@ -1,9 +1,11 @@
 import { requestUrl } from "obsidian";
 import {
   AnalysisResult,
+  AnswerApproval,
   AuxBrainSettings,
   BridgeConfig,
   DraftSelection,
+  DossierJob,
   DocumentQuestionHistory,
   KnowledgeWriteJob,
   LlmTestResult,
@@ -17,7 +19,11 @@ import {
 
 const EXPECTED_COMPANION_SERVICE = "auxbrain-companion";
 const EXPECTED_API_PROTOCOL_VERSION = 1;
-const MINIMUM_COMPANION_VERSION = "0.9.1";
+const MINIMUM_COMPANION_VERSION = "0.11.2";
+
+export class AnswerApprovalError extends Error {
+  constructor(message: string, readonly uncertain: boolean) { super(message); }
+}
 
 export class AuxBrainClient {
   private readonly baseUrl: string;
@@ -77,9 +83,11 @@ export class AuxBrainClient {
     question: string,
     topN: number,
     settings: AuxBrainSettings,
-    onProgress?: (job: UnderstandingJob) => void
+    onProgress?: (job: UnderstandingJob) => void,
+    requestKey: string = crypto.randomUUID()
   ): Promise<UnderstandingResult> {
     const payload = {
+      request_key: requestKey,
       text: draft.text,
       question,
       top_n: topN,
@@ -149,6 +157,24 @@ export class AuxBrainClient {
     const config = await this.get<BridgeConfig>("/api/v1/config");
     this.assertCompatibleCompanion(config);
     return config;
+  }
+
+  async approveAnswer(understandingId: string, answer: string, actor: string, requestKey: string): Promise<AnswerApproval> {
+    const response = await requestUrl({ url: `${this.baseUrl}/api/v1/dossiers/answers/${encodeURIComponent(understandingId)}/approve`,
+      method: "POST", contentType: "application/json", throw: false,
+      body: JSON.stringify({ answer, actor, request_key: requestKey }) });
+    if ([404, 501].includes(response.status)) throw new AnswerApprovalError("当前服务不支持直接认可入库，请更新并重启 Companion 0.13.2+", false);
+    if ([400, 403, 409].includes(response.status)) throw new AnswerApprovalError(response.json?.error || "未能确认入库，请核对回答和原文", false);
+    const result = this.unwrap<AnswerApproval>(response.status, response.json, response.text);
+    if (result.understanding_id !== understandingId || result.status !== "confirmed" || result.approval_scope !== "displayed_answer_only"
+      || typeof result.work_id !== "string" || !Array.isArray(result.item_ids) || !result.item_ids.length || result.item_ids.some(id => typeof id !== "string")) {
+      throw new Error("入库结果待核对，请重试读取同一次操作的结果");
+    }
+    return result;
+  }
+
+  async dossierJob(id: string): Promise<DossierJob> {
+    return this.get<DossierJob>(`/api/v1/dossiers/jobs/${encodeURIComponent(id)}`);
   }
 
   async personalKnowledge(limit = 200): Promise<PersonalKnowledgeSnapshot> {

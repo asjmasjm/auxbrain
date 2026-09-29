@@ -1,8 +1,9 @@
 export type AnalysisMode = "hybrid" | "llm" | "algorithm";
-export type LlmProvider = "deepseek" | "volcengine-ark";
+export type LlmProvider = "deepseek" | "volcengine-ark" | "tencent-token-plan";
 
 export interface AuxBrainSettings {
   bridgeUrl: string;
+  dossierUrl?: string;
   reviewer: string;
   analysisMode: AnalysisMode;
   llmProvider: LlmProvider;
@@ -25,10 +26,13 @@ export interface DocumentSegment {
 }
 
 export interface EvidenceLocator {
-  kind?: "markdown" | "pdf";
+  kind?: "markdown" | "pdf" | "text";
+  highlight_text?: string;
+  source_paragraph_id?: string;
   line_start?: number;
   line_end?: number;
   page?: number;
+  page_end?: number;
   begin_index?: number;
   begin_offset?: number;
   end_index?: number;
@@ -104,6 +108,7 @@ export interface ReviewResult {
 }
 
 export interface BridgeConfig {
+  answer_approval_version?: number;
   service: string;
   service_version: string;
   api_protocol_version: number;
@@ -155,7 +160,13 @@ export interface UnderstandingResult {
   understanding_id: string;
   question: string;
   answer: string;
-  confidence: number;
+  confidence: number | null;
+  dossier?: {
+    work_id: string;
+    paper_id: string;
+    job?: DossierJob | null;
+    confidence_status?: string;
+  };
   provider: string;
   model: string;
   evidence: UnderstandingEvidence[];
@@ -165,6 +176,25 @@ export interface UnderstandingResult {
 }
 
 export type UnderstandingJobStatus = "pending" | "running" | "completed" | "error";
+export interface DossierJob {
+  job_id: string;
+  state: "queued" | "running" | "completed" | "failed";
+  error?: string | null;
+  receipt?: { mode?: string } | null;
+}
+
+export function answerConfidence(result: UnderstandingResult): number | null {
+  const value = result.confidence;
+  return result.dossier?.confidence_status !== "uncalibrated" && typeof value === "number"
+    && Number.isFinite(value) && value >= 0 && value <= 1 ? value : null;
+}
+
+export function evidenceHighlightText(evidence: UnderstandingEvidence): string {
+  const hint = evidence.locator?.highlight_text;
+  const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
+  return typeof hint === "string" && normalize(hint) && normalize(evidence.text).includes(normalize(hint))
+    ? hint : evidence.text;
+}
 export type UnderstandingStageStatus =
   | "pending"
   | "running"
@@ -177,6 +207,7 @@ export interface UnderstandingStage {
   label: string;
   status: UnderstandingStageStatus;
   elapsed_ms: number;
+  children?: UnderstandingStage[];
 }
 
 export interface UnderstandingJob {
@@ -204,6 +235,15 @@ export interface UnderstandingFeedbackResult {
   };
 }
 
+export interface AnswerApproval {
+  understanding_id: string;
+  work_id: string;
+  item_ids: string[];
+  status: "confirmed";
+  approval_scope: "displayed_answer_only";
+  reused: boolean;
+}
+
 export interface KnowledgeWriteJob {
   job_id: string;
   status: UnderstandingJobStatus;
@@ -226,6 +266,7 @@ export interface DocumentQuestionHistory {
 }
 
 export interface PersonalKnowledgeRelation {
+  paper_id?: string;
   assertion_id: string;
   subject_type: string;
   subject_id: string;
@@ -312,7 +353,7 @@ const POLARITY_LABELS: Record<string, string> = {
 
 const SOURCE_LABELS: Record<string, string> = {
   algorithm: "AuxBrain 本地分析",
-  llm: "LLM-Only",
+  llm: "仅 LLM",
   llm_verified: "AuxBrain",
   "llm+algorithm": "AuxBrain",
   human_manual: "人工新增"
@@ -348,24 +389,24 @@ const RELATION_DESCRIPTIONS_ZH: Record<string, string> = {
 };
 
 export function labelEntityType(value: string): string {
-  return ENTITY_TYPE_LABELS[value] ?? value;
+  return ENTITY_TYPE_LABELS[value] ?? (value === "paper" ? "论文" : "未分类实体");
 }
 
 export function labelRelation(value: string): string {
-  return RELATION_LABELS[value] ?? value;
+  return RELATION_LABELS[value] ?? "待识别关系";
 }
 
 export function labelPolarity(value: string): string {
-  return POLARITY_LABELS[value] ?? value;
+  return POLARITY_LABELS[value] ?? "待核对";
 }
 
 export function labelSource(value: string): string {
-  return SOURCE_LABELS[value] ?? value;
+  return SOURCE_LABELS[value] ?? "其他来源";
 }
 
 export function labelMode(value: AnalysisMode): string {
   if (value === "hybrid") return "AuxBrain";
-  if (value === "llm") return "LLM-Only";
+  if (value === "llm") return "仅 LLM";
   return "AuxBrain";
 }
 

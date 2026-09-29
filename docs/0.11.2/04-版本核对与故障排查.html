@@ -1,0 +1,114 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>版本核对与故障排查</title><style>
+:root { color-scheme: light; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }
+body { margin: 0; color: #19252d; background: #fff; line-height: 1.8; }
+main { max-width: 1160px; margin: 0 auto; padding: 32px 28px 72px; }
+h1 { font-size: 28px; border-bottom: 3px solid #169cb5; padding-bottom: 16px; }
+h2 { font-size: 23px; margin-top: 40px; border-top: 1px solid #dce4e7; padding-top: 24px; }
+h3 { font-size: 18px; }
+a { color: #007c99; overflow-wrap: anywhere; }
+p, li, td, th { overflow-wrap: anywhere; }
+img { display: block; max-width: 100%; height: auto; border: 1px solid #dce4e7; margin: 18px 0 8px; }
+blockquote { margin: 20px 0; padding: 10px 18px; border-left: 4px solid #169cb5; background: #f1f8fa; }
+blockquote p { margin: 4px 0; }
+pre { padding: 14px 18px; background: #f3f5f6; overflow-x: auto; }
+code { font-family: Consolas, monospace; font-size: 0.94em; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+td, th { padding: 10px; text-align: left; border: 1px solid #dce4e7; }
+th { background: #eff5f7; }
+em { color: #556570; }
+nav { border-bottom: 1px solid #dce4e7; padding-bottom: 12px; font-size: 14px; }
+@media(max-width: 600px) { main { padding: 18px 14px 40px; } h1 { font-size: 24px; } table { font-size: 12px; } td,th { padding: 6px; } }
+@media print { main { max-width: none; padding: 0; } h2 { break-after: avoid; } img { break-inside: avoid; } nav { display: none; } }
+</style></head><body><main><nav><a href="00-文档导航.html">文档导航</a> | <a href="01-安装与升级.html">安装与升级</a> | <a href="02-使用教程.html">使用教程</a> | <a href="03-个人论文知识库.html">个人论文知识库</a> | <a href="04-版本核对与故障排查.html">版本核对与故障排查</a> | <a href="05-服务商与隐私.html">服务商与隐私</a> | <a href="06-更新说明.html">更新说明</a> | <a href="PROVIDER-USAGE.html">PROVIDER-USAGE</a></nav><h1>AuxBrain v0.11.2 版本核对与故障排查</h1>
+<h2>核对四个版本</h2>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>本版值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>插件 manifest / package / release tag</td>
+<td>0.11.2，GitHub tag 不带 v</td>
+</tr>
+<tr>
+<td>Companion 服务与文件版本</td>
+<td>0.11.2 / 0.11.2.0</td>
+</tr>
+<tr>
+<td>API 协议</td>
+<td>1</td>
+</tr>
+<tr>
+<td>证据选择器</td>
+<td>paragraph-budget-field-slot-selector-v17</td>
+</tr>
+<tr>
+<td>论文档案 schema / 细分进度协议</td>
+<td>3 / 1</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-powershell">Invoke-RestMethod http://127.0.0.1:8795/api/v1/health | ConvertTo-Json -Depth 5
+</code></pre>
+<p>检查 <code>service_version</code>、<code>api_protocol_version</code>、<code>paper_dossiers.schema_version</code>、<code>selection_progress_version</code>。<code>db_path</code> 是个人路径，反馈前请脱敏。<code>active_tasks</code> 统计前台异步问答和知识写入，不是所有后台任务的总数。</p>
+<p>运行包 <code>build-info.json</code> 记录构建时间、后端源码指纹、是否包含本地修改以及 EXE 哈希。本版从当前源码重新编译，不是给旧 ZIP 改名。</p>
+<h2>常见问题</h2>
+<table>
+<thead>
+<tr>
+<th>现象</th>
+<th>排查</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>本地服务未连接</td>
+<td>Companion 是否运行，8795 是否仍被旧程序占用，插件地址是否正确</td>
+</tr>
+<tr>
+<td>版本过旧</td>
+<td>插件与 Companion 都升级，核对 health 而非仅看 ZIP 文件名</td>
+</tr>
+<tr>
+<td>按钮和版本没有变化</td>
+<td>设置中关闭再开启插件；仅关闭侧栏不生效</td>
+</tr>
+<tr>
+<td>筛选耗时较长</td>
+<td>查看每轮响应、首段、接收、本地整理耗时；多轮模型调用会叠加</td>
+</tr>
+<tr>
+<td>只有合并等待时间</td>
+<td>当前模型适配器未启用可分段观测的流式接口，不伪造阶段</td>
+</tr>
+<tr>
+<td>证据没有高亮</td>
+<td>查看文字层、源文件匹配、快照状态、缺失坐标及重复句歧义</td>
+</tr>
+<tr>
+<td>没有“关联本地原文”</td>
+<td>入口按条目状态显示；已有有效定位或没有可关联证据时不必显示</td>
+</tr>
+<tr>
+<td>卡片暂时没有新知识</td>
+<td>查看后台整理状态和提问贡献，候选、失败、无新增是不同状态</td>
+</tr>
+<tr>
+<td>入库结果不明或冲突</td>
+<td>先刷新核对，保留输入，不反复点赞或确认</td>
+</tr>
+<tr>
+<td>供应商认证失败</td>
+<td>检查所选服务、独立 Key、模型和账户权限，不自动换到另一付费接口</td>
+</tr>
+</tbody>
+</table>
+<p>程序冷启动可能比平时慢。不要因短暂等待同时启动多份服务，也不要删除数据库尝试“重置”。</p>
+<h2>验证边界</h2>
+<p>本版进行插件单元测试、TypeScript 构建、后端隔离数据库回归、便携 EXE 新库及重启验证。文档图示另用测试数据检查桌面和窄屏布局。详细结果随本地发布核对报告记录。</p>
+<p>没有为了制作本文档调用付费 LLM、发送用户论文或写入个人演示知识。因此这些测试不能证明每家供应商、每个模型或每篇 PDF 的在线效果。图示不是 Obsidian 原生端到端验收，也不会把假模型的回答当真实答案展示。</p>
+<p>反馈时提供版本、模式、模型名称、阶段耗时和脱敏错误；不要附 Key、完整个人数据库、私有论文全文或未授权的截图。</p>
+</main></body></html>

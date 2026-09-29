@@ -1,0 +1,40 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>更新说明</title><style>
+:root { color-scheme: light; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }
+body { margin: 0; color: #19252d; background: #fff; line-height: 1.8; }
+main { max-width: 1160px; margin: 0 auto; padding: 32px 28px 72px; }
+h1 { font-size: 28px; border-bottom: 3px solid #169cb5; padding-bottom: 16px; }
+h2 { font-size: 23px; margin-top: 40px; border-top: 1px solid #dce4e7; padding-top: 24px; }
+h3 { font-size: 18px; }
+a { color: #007c99; overflow-wrap: anywhere; }
+p, li, td, th { overflow-wrap: anywhere; }
+img { display: block; max-width: 100%; height: auto; border: 1px solid #dce4e7; margin: 18px 0 8px; }
+blockquote { margin: 20px 0; padding: 10px 18px; border-left: 4px solid #169cb5; background: #f1f8fa; }
+blockquote p { margin: 4px 0; }
+pre { padding: 14px 18px; background: #f3f5f6; overflow-x: auto; }
+code { font-family: Consolas, monospace; font-size: 0.94em; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+td, th { padding: 10px; text-align: left; border: 1px solid #dce4e7; }
+th { background: #eff5f7; }
+em { color: #556570; }
+nav { border-bottom: 1px solid #dce4e7; padding-bottom: 12px; font-size: 14px; }
+@media(max-width: 600px) { main { padding: 18px 14px 40px; } h1 { font-size: 24px; } table { font-size: 12px; } td,th { padding: 6px; } }
+@media print { main { max-width: none; padding: 0; } h2 { break-after: avoid; } img { break-inside: avoid; } nav { display: none; } }
+</style></head><body><main><nav><a href="00-文档导航.html">文档导航</a> | <a href="01-安装与升级.html">安装与升级</a> | <a href="02-使用教程.html">使用教程</a> | <a href="03-个人论文知识库.html">个人论文知识库</a> | <a href="04-版本核对与故障排查.html">版本核对与故障排查</a> | <a href="05-服务商与隐私.html">服务商与隐私</a> | <a href="06-更新说明.html">更新说明</a> | <a href="PROVIDER-USAGE.html">PROVIDER-USAGE</a></nav><h1>AuxBrain v0.11.2 Beta 更新说明</h1>
+<p>此版本把之前在本地 0.9.1 上持续完成的前后端更新汇总为新的配套版本。插件、Companion、下载入口和文档统一使用 0.11.2；算法和数据库结构不因改版本号而被清空或重置。</p>
+<h2>主要变化</h2>
+<ul>
+<li>包含当前后端 v17 段落预算证据选择器及请求级计时诊断，不回退到 v16。</li>
+<li>个人知识库使用论文卡片，包含基本信息、八维结构化知识和提问贡献，保留旧知识图谱入口。</li>
+<li>核对流程区分原文摘录与知识表述，折叠长段、消除重复原文，明确提炼、确认、修改和撤回操作；新表述不自动确认。</li>
+<li>对接 schema 3 的证据位置持久化、论文版本核对、人工审核与同论文已确认记忆。</li>
+<li>增加未载入文档的右键入口，明确卡片原文证据与本地文件关联入口。</li>
+<li>证据筛选按轮次细分真实等待、首段、接收、本地整理耗时；非流式接口使用合并阶段。</li>
+<li>包含腾讯可选模型适配与三家供应商声明，Key 保存和连接测试分离。</li>
+<li>更新全套安装、升级、使用、知识库、隐私、故障排查及版本核对文档。</li>
+</ul>
+<h2>升级提醒</h2>
+<p>两个组件一起更新。停止旧服务并备份 profile，启动新版，再关闭并开启插件。保留原数据库路径。GitHub tag 为 <code>0.11.2</code>，产品展示可写 <code>v0.11.2</code>。</p>
+<h2>保留限制</h2>
+<p>Windows 便携程序仍未签名；通过 GitHub/BRAT 测试，不进入正式市场。供应商条款与账户限制需要用户确认。没有增加扫描件 OCR、VLM 图表摄取或自动联网补齐元数据。计时细化是可观测性改进，不是承诺每次提问更快。</p>
+<p>公开文件不包含算法源码、个人数据或用户论文截图。文档图示使用虚构数据，未伪装成真实问答。旧版文档与备份保留，但本次安装应以本版配套文件及其 <code>SHA256SUMS.txt</code> 为准。</p>
+</main></body></html>

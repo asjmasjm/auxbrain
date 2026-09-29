@@ -1,6 +1,9 @@
 import { ItemView, Notice, Setting, WorkspaceLeaf, setIcon } from "obsidian";
 import {
   AnalysisResult,
+  AnswerApproval,
+  answerConfidence,
+  DossierJob,
   DraftSelection,
   DocumentQuestionHistory,
   ReviewResult,
@@ -24,6 +27,12 @@ import {
   labelRelation
 } from "./contracts";
 import { friendlyError } from "./errors";
+import { AnswerApprovalError } from "./api";
+import { PaperLibraryClient } from "./paper-library-client";
+import { AnswerKnowledgePanel } from "./answer-knowledge-panel";
+import { PaperLibraryView } from "./paper-library-view";
+import { DossierJobTracker, dossierJobLabel } from "./dossier-jobs";
+import { prepareEvidenceBinding, verifyEvidenceSource } from "./paper-evidence-source";
 
 export const VIEW_TYPE_AUXBRAIN = "fkms-obsidian-ui-view";
 const DEFAULT_EVIDENCE_COUNT = 1;
@@ -31,23 +40,23 @@ const QUESTION_SUGGESTION_COUNT = 5;
 const RECOMMENDED_QUESTIONS = [
   {
     question: "这篇文章用了什么真机测试？",
-    description: "Which real-world robot platforms were used for evaluation?"
+    description: "真机平台与测试任务"
   },
   {
     question: "使用了哪些数据集，分别用于训练还是评估？",
-    description: "Which datasets were used for training and evaluation?"
+    description: "训练数据与评测数据"
   },
   {
     question: "提出了什么方法，核心改进是什么？",
-    description: "What method was proposed, and what is its core contribution?"
+    description: "核心方案与创新点"
   },
   {
     question: "与哪些基线进行了比较，结果如何？",
-    description: "Which baselines were compared, and what were the results?"
+    description: "对比方法与实验结论"
   },
   {
     question: "做了哪些消融实验？",
-    description: "Which ablation studies were conducted?"
+    description: "各个组件的作用"
   }
 ];
 
@@ -69,7 +78,8 @@ export interface AuxBrainViewHost {
     draft: DraftSelection,
     question: string,
     topN: number,
-    onProgress?: (job: UnderstandingJob) => void
+    onProgress?: (job: UnderstandingJob) => void,
+    requestKey?: string
   ): Promise<UnderstandingResult>;
   submitUnderstandingFeedback(
     understandingId: string,
@@ -91,6 +101,8 @@ export interface AuxBrainViewHost {
   ): Promise<void>;
   getSettings(): AuxBrainSettings;
   client(): {
+    approveAnswer(id: string, answer: string, actor: string, requestKey: string): Promise<AnswerApproval>;
+    dossierJob(id: string): Promise<DossierJob>;
     configuration(): Promise<BridgeConfig>;
     personalKnowledge(limit?: number): Promise<PersonalKnowledgeSnapshot>;
     questionHistory(
@@ -127,15 +139,28 @@ export class AuxBrainView extends ItemView {
   private evidenceDisplayCount = DEFAULT_EVIDENCE_COUNT;
   private understandingBusy = false;
   private feedbackBusy = false;
+  private approvalKey = "";
+  private answerKnowledge: { key: string; panel: AnswerKnowledgePanel } | null = null;
+  private approvalError = "";
+  private approvalNeedsCheck = false;
+  private approvedAnswer: AnswerApproval | null = null;
+  private answerCorrectionSaved = false;
   private knowledgeWriteJob: KnowledgeWriteJob | null = null;
   private contributionBusy = false;
   private reviewBusy = false;
+  private cardReviewActive = false;
   private reviewCompleted = false;
   private feedbackRating: "up" | "down" | null = null;
   private feedbackKnowledge: UnderstandingFeedbackResult["knowledge"] | null = null;
   private showEvidenceReasoning = false;
   private showKnowledgeBase = false;
+  private showLegacyKnowledge = false;
+  private paperLibrary: PaperLibraryView | null = null;
+  private paperLibraryUrl = "";
   private knowledge: PersonalKnowledgeSnapshot | null = null;
+  private knowledgeScope: import("./paper-library-contracts").PaperCard | null = null;
+  private knowledgeReader: (() => Promise<PersonalKnowledgeSnapshot>) | null = null;
+  private knowledgeRequestId = 0;
   private knowledgeLoading = false;
   private knowledgeError = "";
   private selectedKnowledgeNodeId: string | null = null;
@@ -148,10 +173,21 @@ export class AuxBrainView extends ItemView {
   private documentError = "";
   private pendingDocumentTitle = "";
   private closed = false;
+  private pendingQuestionRequest: { fingerprint: string; key: string } | null = null;
+  private dossierJob: DossierJob | null = null;
+  private dossierProblem = "";
+  private readonly dossierTracker: DossierJobTracker;
 
   constructor(leaf: WorkspaceLeaf, host: AuxBrainViewHost) {
     super(leaf);
     this.host = host;
+    this.dossierTracker = new DossierJobTracker(id => this.host.client().dossierJob(id), (job, problem) => {
+      this.dossierJob = job;
+      this.dossierProblem = problem;
+      const status = this.containerEl.querySelector?.<HTMLElement>(".ab-dossier-job");
+      if (status) this.renderDossierStatus(status);
+      if (job.state === "completed" || job.state === "failed") void this.paperLibrary?.refresh();
+    });
   }
 
   getViewType(): string {
@@ -170,6 +206,11 @@ export class AuxBrainView extends ItemView {
 
   async onClose(): Promise<void> {
     this.closed = true;
+    this.answerKnowledge?.panel.dispose(); this.answerKnowledge = null;
+    this.knowledgeRequestId++;
+    this.dossierTracker.stop();
+    this.paperLibrary?.dispose();
+    this.paperLibrary = null;
     this.questionHistoryRequestId += 1;
     for (const observer of this.knowledgeGraphObservers) observer.disconnect();
     this.knowledgeGraphObservers = [];
@@ -177,6 +218,9 @@ export class AuxBrainView extends ItemView {
 
   get documentPath(): string | null {
     return this.draft?.sourcePath ?? null;
+  }
+  hasDocumentContext(path: string): boolean {
+    return this.documentPath === path && (this.documentLoading || (!this.documentError && !!this.draft?.text.trim()));
   }
 
   setPendingDocument(title: string): void {
@@ -201,10 +245,11 @@ export class AuxBrainView extends ItemView {
     return this.understandingBusy
       || this.interpretationBusy
       || this.feedbackBusy
-      || this.reviewBusy;
+      || this.reviewBusy || this.cardReviewActive;
   }
 
   workflowBusyMessage(): string {
+    if (this.cardReviewActive) return "正在审核卡片知识，请先返回论文卡片";
     if (this.feedbackBusy || this.reviewBusy) {
       return "知识库正在写入，请等待当前任务完成";
     }
@@ -222,6 +267,8 @@ export class AuxBrainView extends ItemView {
   }
 
   private resetDraft(draft: DraftSelection): void {
+    this.knowledgeRequestId++; this.knowledge = null; this.knowledgeScope = null; this.knowledgeReader = null;
+    this.knowledgeLoading = false; this.knowledgeError = "";
     this.draft = draft;
     this.documentLoading = false;
     this.documentError = "";
@@ -238,16 +285,25 @@ export class AuxBrainView extends ItemView {
     this.analyzedInterpretation = "";
     this.interpretationBusy = false;
     this.feedbackBusy = false;
+    this.approvalKey = ""; this.approvalError = ""; this.approvalNeedsCheck = false; this.approvedAnswer = null; this.answerCorrectionSaved = false;
+    this.answerKnowledge?.panel.dispose(); this.answerKnowledge = null;
     this.knowledgeWriteJob = null;
     this.contributionBusy = false;
     this.reviewBusy = false;
     this.reviewCompleted = false;
     this.question = "";
+    this.dossierTracker.stop();
+    this.dossierJob = null;
+    this.dossierProblem = "";
+    this.pendingQuestionRequest = null;
     this.feedbackRating = null;
     this.feedbackKnowledge = null;
     this.showEvidenceReasoning = false;
     this.evidenceDisplayCount = DEFAULT_EVIDENCE_COUNT;
     this.showKnowledgeBase = false;
+    this.paperLibrary?.dispose();
+    this.paperLibrary = null;
+    this.showLegacyKnowledge = false;
     this.selectedKnowledgeNodeId = null;
   }
 
@@ -331,11 +387,17 @@ export class AuxBrainView extends ItemView {
       return;
     }
     if (this.showKnowledgeBase) {
-      this.renderBackNavigation(container, () => {
-        this.showKnowledgeBase = false;
-        this.selectedKnowledgeNodeId = null;
-        this.render();
-      });
+      if (this.showLegacyKnowledge) {
+        this.renderBackNavigation(container, () => {
+          this.showKnowledgeBase = false;
+          this.selectedKnowledgeNodeId = null;
+          this.render();
+        });
+        const cards = container.createEl("button", { attr: { type: "button" } });
+        setIcon(cards.createSpan({ cls: "fkms-button-icon" }), "panels-top-left");
+        cards.createSpan({ text: "返回论文卡片" });
+        cards.onclick = () => { this.knowledgeRequestId++; this.knowledgeLoading = false; this.showLegacyKnowledge = false; this.render(); };
+      }
       this.renderPersonalKnowledge(container);
       return;
     }
@@ -380,7 +442,7 @@ export class AuxBrainView extends ItemView {
   private renderAnnotation(container: HTMLElement): void {
     if (!this.draft) return;
     if (this.correctionEvidence) {
-      this.renderBackNavigation(container, () => this.exitCorrection());
+      this.renderBackNavigation(container, () => this.exitCorrection(), "返回回答");
       container.createDiv({
         cls: "fkms-correction-evidence",
         text: this.correctionEvidence.text
@@ -394,7 +456,7 @@ export class AuxBrainView extends ItemView {
 
     container.createEl("label", {
       text: this.correctionEvidence
-        ? "你对这句话阐述的道理"
+        ? "修正后的回答"
         : "你对这段话的理解"
     });
     const input = container.createEl("textarea", {
@@ -402,7 +464,7 @@ export class AuxBrainView extends ItemView {
       attr: {
         rows: "5",
         placeholder: this.correctionEvidence
-          ? "请输入你对这句话阐述的道理"
+          ? "修改回答中不准确的部分"
           : "例如：本文使用 DROID 训练模型，在 RoboCasa 上评估，并与 OpenVLA 进行比较。"
       }
     });
@@ -529,7 +591,7 @@ export class AuxBrainView extends ItemView {
         ? "入库中"
         : this.reviewCompleted
           ? "已入库"
-          : "确认并入库"
+          : "同意并入库"
     });
     confirm.disabled = !canConfirm;
     confirm.onclick = () => void this.submitInterpretationReview();
@@ -620,6 +682,7 @@ export class AuxBrainView extends ItemView {
     try {
       const result = await this.host.submitReview(this.analysis.analysis_id, facts);
       this.reviewCompleted = true;
+      if (this.correctionEvidence && result.accepted > 0) this.answerCorrectionSaved = true;
       this.knowledge = null;
       new Notice(`已将 ${result.accepted} 条关系写入个人知识库`);
     } catch (error) {
@@ -634,12 +697,6 @@ export class AuxBrainView extends ItemView {
   private renderUnderstanding(container: HTMLElement): void {
     if (!this.draft) return;
     const questionLocked = this.understandingBusy || this.feedbackBusy || this.reviewBusy;
-    if (this.showEvidenceReasoning) {
-      this.renderBackNavigation(container, () => {
-        this.showEvidenceReasoning = false;
-        this.render();
-      });
-    }
     this.renderDocumentBanner(container);
 
     container.createEl("label", { text: "针对当前文档提问" });
@@ -782,102 +839,107 @@ export class AuxBrainView extends ItemView {
     const answerHeader = container.createDiv({ cls: "fkms-answer-header" });
     answerHeader.createEl("h3", { text: "回答" });
     const answerMeta = answerHeader.createDiv({ cls: "fkms-answer-meta" });
+    const confidenceValue = answerConfidence(result);
     answerMeta.createSpan({
       cls: "fkms-confidence-label",
-      text: `综合置信度 ${Math.round(result.confidence * 100)}%`
+      text: confidenceValue === null ? "置信度未校准" : `综合置信度 ${Math.round(confidenceValue * 100)}%`
     });
-    const confidence = container.createEl("progress", {
-      cls: "fkms-confidence-progress",
-      attr: {
-        max: "1",
-        value: String(result.confidence),
-        "aria-label": "回答综合置信度"
-      }
-    });
-    confidence.value = result.confidence;
+    if (confidenceValue !== null) {
+      const confidence = container.createEl("progress", {
+        cls: "fkms-confidence-progress",
+        attr: { max: "1", value: String(confidenceValue), "aria-label": "回答综合置信度" }
+      });
+      confidence.value = confidenceValue;
+    }
     container.createDiv({ cls: "fkms-understanding-answer", text: result.answer });
+    if (this.dossierJob) {
+      const status = container.createDiv({ cls: "ab-dossier-job", attr: { role: "status" } });
+      this.renderDossierStatus(status);
+    }
     if (!this.understandingJob) {
       this.renderTokenUsage(container, result.usage);
-    }
-
-    if (!this.showEvidenceReasoning) {
-      const feedback = container.createDiv({ cls: "fkms-understanding-feedback" });
-      feedback.createSpan({
-        text: this.feedbackBusy ? "正在确认并写入知识库" : "这个回答是否有帮助？"
-      });
-      feedback.appendChild(
-        this.feedbackButton("thumbs-up", "认可回答并写入知识库", "up", () => {
-          void this.rateUnderstanding("up");
-        })
-      );
-      feedback.appendChild(
-        this.feedbackButton("thumbs-down", "不认可回答", "down", () => {
-          void this.rateUnderstanding("down");
-        })
-      );
-      const reasoningButton = feedback.createEl("button", {
-        cls: "fkms-reasoning-toggle",
-        attr: {
-          type: "button",
-          "aria-expanded": "false"
-        }
-      });
-      const reasoningIcon = reasoningButton.createSpan({
-        cls: "fkms-button-icon",
-        attr: { "aria-hidden": "true" }
-      });
-      setIcon(reasoningIcon, "list-tree");
-      reasoningButton.createSpan({ text: "查看AuxBrain回答依据" });
-      reasoningButton.disabled = this.feedbackBusy || this.reviewBusy;
-      reasoningButton.onclick = () => {
-        this.showEvidenceReasoning = true;
-        this.evidenceDisplayCount = DEFAULT_EVIDENCE_COUNT;
-        this.render();
-      };
-      if (this.feedbackRating) {
-        feedback.createSpan({
-          cls: "fkms-feedback-saved",
-          text: this.feedbackStatusText()
-        });
-      }
-      if (this.knowledgeWriteJob) {
-        const progress = container.createDiv({
-          cls: "fkms-understanding-progress fkms-knowledge-write-progress"
-        });
-        this.renderStageProgress(
-          progress,
-          this.knowledgeWriteJob,
-          "知识入库中",
-          "知识入库完成",
-          "知识入库失败",
-          false
-        );
-      }
-      return;
     }
 
     const availableEvidence = result.evidence_candidates?.length
       ? result.evidence_candidates
       : result.evidence;
-    this.renderEvidenceReasoning(container, availableEvidence);
-    const correction = container.createEl("button", {
-      cls: "fkms-correction-start mod-cta",
-      text: "我要修正",
-      attr: { type: "button" }
-    });
-    correction.disabled = availableEvidence.length === 0 || this.isWorkflowBusy();
-    correction.onclick = () => {
-      const evidence = availableEvidence[0];
-      if (!evidence) return;
-      this.correctionEvidence = evidence;
-      this.analysis = null;
-      this.interpretation = "";
-      this.analyzedInterpretation = "";
-      this.interpretationBusy = false;
-      this.reviewBusy = false;
-      this.reviewCompleted = false;
-      this.render();
+    const answerActions = container.createDiv({ cls: "fkms-answer-actions" });
+    const action = (label: string, icon: string, run: () => void, primary = false) => {
+      const b = answerActions.createEl("button", { cls: primary ? "mod-cta" : "", attr: { type: "button", "aria-label": label } });
+      setIcon(b.createSpan({ cls: "fkms-button-icon" }), icon); b.createSpan({ text: label });
+      b.disabled = this.isWorkflowBusy(); b.onclick = run; return b;
     };
+    const finished = !!this.approvedAnswer || this.answerCorrectionSaved;
+    const approve = action(this.feedbackBusy ? "正在入库" : this.approvedAnswer ? "已同意入库" : this.answerCorrectionSaved ? "修正已入库" : this.approvalError ? "重试入库" : "同意并入库", this.feedbackBusy ? "loader-circle" : "thumbs-up", () => void this.approveUnderstanding(), true);
+    approve.disabled = this.isWorkflowBusy() || finished || this.bridgeConfig?.answer_approval_version !== 1;
+    if (this.feedbackBusy) approve.querySelector(".fkms-button-icon")?.classList.add("is-spinning");
+    const correction = action(finished ? "查看知识" : "我要修正", finished ? "database" : "pencil", () => {
+      if (finished) {
+        this.showKnowledgeBase = true; this.showLegacyKnowledge = false; this.render();
+        if (this.approvedAnswer) void this.library().openPaper(this.approvedAnswer.work_id);
+        return;
+      }
+      this.startAnswerCorrection();
+    });
+    correction.disabled = this.isWorkflowBusy() || (!finished && !availableEvidence.length) || this.approvalNeedsCheck;
+    const reasoning = action(this.showEvidenceReasoning ? "收起依据" : "查看AuxBrain回答依据", "list-tree", () => {
+      this.showEvidenceReasoning = !this.showEvidenceReasoning;
+      this.evidenceDisplayCount = DEFAULT_EVIDENCE_COUNT;
+      this.render();
+    });
+    reasoning.setAttribute("aria-expanded", String(this.showEvidenceReasoning));
+    if (this.bridgeConfig?.answer_approval_version !== 1) container.createDiv({ cls: "fkms-warning", text: "同意入库需要将本地服务更新至 0.13.2 或更高版本" });
+    if (this.approvalError) container.createDiv({ cls: "fkms-warning", text: this.approvalError, attr: { role: "alert" } });
+    if (this.feedbackBusy || finished) container.createDiv({ cls: "fkms-feedback-saved", text: this.feedbackBusy ? "正在保存回答与原文依据" : this.approvedAnswer ? "回答与原文依据已确认入库" : "修正已保存，原回答未自动入库", attr: { role: "status" } });
+    if (this.showEvidenceReasoning) this.renderEvidenceReasoning(container, availableEvidence);
+  }
+
+  private startAnswerCorrection(): void {
+    if (!this.understanding || this.isWorkflowBusy() || this.approvedAnswer || this.answerCorrectionSaved || this.approvalNeedsCheck) return;
+    const pool = this.understanding.evidence_candidates?.length ? this.understanding.evidence_candidates : this.understanding.evidence;
+    const cited = pool.filter(e => e.cited), evidence = cited.length ? cited : pool;
+    if (!evidence.length) return;
+    this.correctionEvidence = { ...evidence[0], text: [...new Set(evidence.map(e => e.text))].join("\n\n") };
+    this.analysis = null;
+    this.interpretation = this.understanding.answer;
+    this.analyzedInterpretation = ""; this.interpretationBusy = false; this.reviewBusy = false; this.reviewCompleted = false;
+    this.render();
+  }
+
+  private async approveUnderstanding(): Promise<void> {
+    if (!this.understanding || this.isWorkflowBusy() || this.approvedAnswer || this.answerCorrectionSaved || this.bridgeConfig?.answer_approval_version !== 1) return;
+    const answer = this.understanding;
+    this.approvalKey ||= crypto.randomUUID();
+    this.feedbackBusy = true; this.approvalError = ""; this.render();
+    try {
+      const result = await this.host.client().approveAnswer(answer.understanding_id, answer.answer, this.host.getSettings().reviewer, this.approvalKey);
+      if (this.closed || this.understanding !== answer) return;
+      this.approvedAnswer = result; this.approvalNeedsCheck = false; this.feedbackRating = "up"; this.knowledge = null;
+      this.answerKnowledge?.panel.dispose(); this.answerKnowledge = null;
+      this.paperLibrary?.dispose(); this.paperLibrary = null;
+      new Notice("回答与原文依据已确认入库");
+    } catch (error) {
+      if (!this.closed && this.understanding === answer) {
+        this.approvalNeedsCheck = !(error instanceof AnswerApprovalError) || error.uncertain;
+        this.approvalError = `${this.approvalNeedsCheck ? "入库结果待核对" : "未确认入库"}：${this.errorMessage(error)}`;
+      }
+    } finally {
+      this.feedbackBusy = false; this.render(); this.host.onWorkflowIdle();
+    }
+  }
+
+  private renderDossierStatus(status: HTMLElement): void {
+    status.empty();
+    if (!this.dossierJob) return;
+    const running = ["queued", "running"].includes(this.dossierJob.state) && !this.dossierProblem;
+    const icon = status.createSpan({ cls: running ? "fkms-progress-stage-icon is-spinning" : "fkms-button-icon" });
+    setIcon(icon, running ? "loader-circle" : this.dossierJob.state === "completed" ? "check" : "info");
+    status.createSpan({ text: this.dossierProblem || dossierJobLabel(this.dossierJob) });
+    if (this.dossierProblem) {
+      const refresh = status.createEl("button", { cls: "clickable-icon", attr: { type: "button", "aria-label": "刷新知识整理状态", title: "刷新知识整理状态" } });
+      setIcon(refresh, "refresh-cw");
+      refresh.onclick = () => { if (this.dossierJob) this.dossierTracker.start(this.dossierJob); };
+    }
   }
 
   private async runUnderstanding(): Promise<void> {
@@ -898,19 +960,32 @@ export class AuxBrainView extends ItemView {
         return;
       }
       this.understanding = null;
+      this.dossierTracker.stop();
+      this.dossierJob = null;
+      this.dossierProblem = "";
       this.understandingJob = this.pendingUnderstandingJob();
       this.knowledgeWriteJob = null;
+      this.approvalKey = ""; this.approvalError = ""; this.approvalNeedsCheck = false; this.approvedAnswer = null; this.answerCorrectionSaved = false;
+      this.answerKnowledge?.panel.dispose(); this.answerKnowledge = null;
       this.feedbackRating = null;
       this.feedbackKnowledge = null;
       this.showEvidenceReasoning = false;
       this.evidenceDisplayCount = DEFAULT_EVIDENCE_COUNT;
       this.render();
+      const settings = this.host.getSettings();
+      const fingerprint = JSON.stringify([this.draft, question, DEFAULT_EVIDENCE_COUNT, settings]);
+      if (this.pendingQuestionRequest?.fingerprint !== fingerprint) {
+        this.pendingQuestionRequest = { fingerprint, key: crypto.randomUUID() };
+      }
       this.understanding = await this.host.askUnderstanding(
         this.draft,
         question,
         DEFAULT_EVIDENCE_COUNT,
-        (job) => this.updateUnderstandingProgress(job)
+        (job) => this.updateUnderstandingProgress(job),
+        this.pendingQuestionRequest.key
       );
+      this.pendingQuestionRequest = null;
+      if (!this.closed && this.understanding.dossier?.job) this.dossierTracker.start(this.understanding.dossier.job);
       await this.loadQuestionHistory(this.draft);
     } catch (error) {
       new Notice(`回答失败：${friendlyError(error)}`);
@@ -953,9 +1028,10 @@ export class AuxBrainView extends ItemView {
     const mode = this.host.getSettings().analysisMode;
     const stageIds = mode === "llm"
       ? ["evidence_retrieval", "waiting_llm", "llm_answer"]
-      : ["evidence_retrieval", "waiting_llm", "llm_answer", "algorithm_revision"];
+      : ["evidence_retrieval", "evidence_selection", "waiting_llm", "llm_answer", "algorithm_revision"];
     const labels: Record<string, string> = {
       evidence_retrieval: "准备候选证据",
+      evidence_selection: "AuxBrain+LLM协同",
       waiting_llm: "连接 LLM",
       llm_answer: "LLM 生成答案",
       algorithm_revision: "AuxBrain校正"
@@ -1014,6 +1090,13 @@ export class AuxBrainView extends ItemView {
     );
   }
 
+  private progressRows(stages: UnderstandingStage[]): Array<UnderstandingStage & { detail: boolean }> {
+    return stages.flatMap(stage => stage.id === "evidence_selection"
+      ? [{ ...stage, label: "AuxBrain+LLM协同", detail: false }]
+      : [{ ...stage, detail: false },
+        ...(stage.children ?? []).map(child => ({ ...child, detail: true }))]);
+  }
+
   private renderStageProgress(
     container: HTMLElement,
     job: UnderstandingJob | KnowledgeWriteJob,
@@ -1036,9 +1119,9 @@ export class AuxBrainView extends ItemView {
       cls: "fkms-progress-total",
       text: `总计 ${this.formatDuration(job.elapsed_ms)}`
     });
-    for (const stage of job.stages) {
+    for (const stage of this.progressRows(job.stages)) {
       const stageElement = container.createDiv({
-        cls: `fkms-progress-stage is-${stage.status}`,
+        cls: `fkms-progress-stage is-${stage.status}${stage.detail ? " is-detail" : ""}`,
         attr: {
           "data-stage-id": stage.id,
           "data-stage-status": stage.status
@@ -1092,7 +1175,7 @@ export class AuxBrainView extends ItemView {
     );
     total.setText(`总计 ${this.formatDuration(job.elapsed_ms)}`);
 
-    for (const stage of job.stages) {
+    for (const stage of this.progressRows(job.stages)) {
       const stageElement = Array.from(
         container.querySelectorAll<HTMLElement>(".fkms-progress-stage")
       ).find((element) => element.dataset.stageId === stage.id);
@@ -1181,76 +1264,6 @@ export class AuxBrainView extends ItemView {
     }).format(date);
   }
 
-  private async rateUnderstanding(rating: "up" | "down"): Promise<void> {
-    if (
-      !this.understanding
-      || this.feedbackBusy
-      || this.reviewBusy
-      || this.understandingBusy
-    ) return;
-    this.feedbackBusy = true;
-    this.knowledgeWriteJob = this.pendingKnowledgeWriteJob();
-    this.render();
-    try {
-      const result = await this.host.submitUnderstandingFeedback(
-        this.understanding.understanding_id,
-        rating,
-        null,
-        (job) => this.updateKnowledgeWriteProgress(job)
-      );
-      this.feedbackRating = rating;
-      this.feedbackKnowledge = result.knowledge;
-      if (rating === "up") {
-        this.knowledge = null;
-        if (result.knowledge.status === "stored") {
-          new Notice(`回答已认可，并写入 ${result.knowledge.accepted} 个知识点`);
-        } else if (result.knowledge.status === "already_stored") {
-          new Notice("该回答已经写入个人知识库");
-        } else if (result.knowledge.status === "no_relations") {
-          new Notice("回答已保存，暂未提炼出可绑定原文的实体关系");
-        } else if (result.knowledge.status === "error") {
-          new Notice(`回答已保存，关系入库失败：${result.knowledge.warnings[0] ?? "未知错误"}`);
-        }
-      }
-      this.render();
-    } catch (error) {
-      new Notice(`评价保存失败：${this.errorMessage(error)}`);
-    } finally {
-      this.feedbackBusy = false;
-      this.render();
-      this.host.onWorkflowIdle();
-    }
-  }
-
-  private pendingKnowledgeWriteJob(): KnowledgeWriteJob {
-    const stages = [
-      ["save_feedback", "保存用户确认"],
-      ["relation_extraction", "解析实体关系"],
-      ["knowledge_write", "写入个人知识库"]
-    ] as const;
-    return {
-      job_id: "local-knowledge-pending",
-      status: "running",
-      mode: "knowledge",
-      elapsed_ms: 0,
-      stages: stages.map(([id, label], index) => ({
-        id,
-        label,
-        status: index === 0 ? "running" : "pending",
-        elapsed_ms: 0
-      })),
-      result: null,
-      error: ""
-    };
-  }
-
-  private feedbackStatusText(): string {
-    if (this.feedbackRating === "down") return "已记录不认可";
-    const accepted = this.feedbackKnowledge?.accepted ?? 0;
-    if (accepted > 0) return `已认可 · 入库 ${accepted} 条`;
-    if (this.feedbackKnowledge?.status === "error") return "已认可 · 入库失败";
-    return "已认可 · 回答已保存";
-  }
 
   private renderEvidenceReasoning(
     container: HTMLElement,
@@ -1265,7 +1278,7 @@ export class AuxBrainView extends ItemView {
         attr: { "aria-label": "支持证据数量" }
       });
       for (let value = 1; value <= Math.min(10, evidence.length); value += 1) {
-        selector.createEl("option", { value: String(value), text: `Top-${value}` });
+        selector.createEl("option", { value: String(value), text: `前 ${value} 条` });
       }
       selector.value = String(count);
       selector.onchange = () => {
@@ -1306,26 +1319,18 @@ export class AuxBrainView extends ItemView {
       });
       setIcon(navigateIcon, "locate-fixed");
     }
+    const answer = this.understanding;
+    if (answer?.dossier?.work_id) {
+      const settings = this.host.getSettings(), url = settings.dossierUrl?.trim() || settings.bridgeUrl;
+      const key = JSON.stringify([url, answer.dossier.work_id, answer.understanding_id]);
+      if (this.answerKnowledge?.key !== key) {
+        this.answerKnowledge?.panel.dispose();
+        this.answerKnowledge = { key, panel: new AnswerKnowledgePanel(new PaperLibraryClient(url).answerKnowledgeSource(), answer.dossier.work_id, answer.understanding_id) };
+      }
+      this.answerKnowledge.panel.mount(container.createDiv());
+    }
   }
 
-  private feedbackButton(
-    icon: string,
-    label: string,
-    rating: "up" | "down",
-    action: () => void
-  ): HTMLButtonElement {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "clickable-icon fkms-feedback-button";
-    button.setAttribute("aria-label", label);
-    button.setAttribute("data-tooltip-position", "top");
-    button.setAttribute("aria-pressed", String(this.feedbackRating === rating));
-    button.classList.toggle("is-active", this.feedbackRating === rating);
-    button.disabled = this.isWorkflowBusy() || this.feedbackRating !== null;
-    setIcon(button, icon);
-    button.onclick = action;
-    return button;
-  }
 
   private renderDocumentBanner(container: HTMLElement): void {
     if (!this.draft) return;
@@ -1337,14 +1342,14 @@ export class AuxBrainView extends ItemView {
     identity.createDiv({ cls: "fkms-document-path", text: this.draft.sourcePath });
   }
 
-  private renderBackNavigation(container: HTMLElement, action: () => void): void {
+  private renderBackNavigation(container: HTMLElement, action: () => void, label = "返回主菜单"): void {
     const navigation = container.createDiv({ cls: "fkms-back-navigation" });
     const button = navigation.createEl("button", {
-      attr: { type: "button", "aria-label": "返回主菜单" }
+      attr: { type: "button", "aria-label": label }
     });
     const icon = button.createSpan({ cls: "fkms-button-icon" });
     setIcon(icon, "arrow-left");
-    button.createSpan({ text: "返回主菜单" });
+    button.createSpan({ text: label });
     button.disabled = this.isWorkflowBusy();
     button.onclick = action;
   }
@@ -1368,16 +1373,21 @@ export class AuxBrainView extends ItemView {
     button.disabled = this.isWorkflowBusy();
     button.onclick = () => {
       this.showKnowledgeBase = !this.showKnowledgeBase;
+      this.showLegacyKnowledge = false;
+      this.paperLibrary?.dispose();
+      this.paperLibrary = null;
       this.selectedKnowledgeNodeId = null;
       this.render();
-      if (this.showKnowledgeBase && !this.knowledgeLoading) {
-        void this.loadPersonalKnowledge();
-      }
     };
     return button;
   }
 
   private renderPersonalKnowledge(container: HTMLElement): void {
+    if (!this.showLegacyKnowledge) {
+      this.library().mount(container.createDiv({ cls: "ab-library-mount" }));
+      return;
+    }
+    if (this.knowledgeScope) container.createEl("h3", { text: `${this.knowledgeScope.title} · 知识图谱` });
     if (this.knowledgeLoading && !this.knowledge) {
       const loading = container.createDiv({ cls: "fkms-knowledge-state" });
       const icon = loading.createSpan({ cls: "fkms-progress-stage-icon is-spinning" });
@@ -1403,7 +1413,7 @@ export class AuxBrainView extends ItemView {
     if (!this.knowledge.relations.length) {
       container.createDiv({
         cls: "fkms-empty fkms-knowledge-empty",
-        text: "尚未建立已确认的实体关系"
+        text: this.knowledgeScope ? "本篇论文尚未建立已确认的实体关系" : "尚未建立已确认的实体关系"
       });
       return;
     }
@@ -1411,9 +1421,9 @@ export class AuxBrainView extends ItemView {
     const list = container.createDiv({ cls: "fkms-knowledge-graphs" });
     const papers = this.groupKnowledgeByPaper(this.knowledge.relations);
     let graphIndex = 0;
-    for (const [paperTitle, relations] of papers) {
+    for (const [, relations] of papers) {
       graphIndex += 1;
-      this.renderKnowledgeGraph(list, paperTitle, relations, graphIndex);
+      this.renderKnowledgeGraph(list, relations[0].paper_title || "未命名论文", relations, graphIndex);
     }
     if (this.knowledge.total > this.knowledge.relations.length) {
       container.createDiv({
@@ -1428,10 +1438,10 @@ export class AuxBrainView extends ItemView {
   ): Map<string, PersonalKnowledgeRelation[]> {
     const papers = new Map<string, PersonalKnowledgeRelation[]>();
     for (const relation of relations) {
-      const paperTitle = relation.paper_title || relation.subject_name || "未命名论文";
-      const group = papers.get(paperTitle) ?? [];
+      const identity = relation.paper_id || relation.source_uri || relation.paper_title || "未命名论文";
+      const group = papers.get(identity) ?? [];
       group.push(relation);
-      papers.set(paperTitle, group);
+      papers.set(identity, group);
     }
     return papers;
   }
@@ -1442,6 +1452,7 @@ export class AuxBrainView extends ItemView {
     relations: PersonalKnowledgeRelation[],
     graphIndex: number
   ): void {
+    const graphKey = relations[0]?.paper_id || relations[0]?.source_uri || `${paperTitle}:${graphIndex}`;
     const section = container.createDiv({ cls: "fkms-knowledge-graph-section" });
     const header = section.createDiv({ cls: "fkms-knowledge-graph-header" });
     const headerIcon = header.createSpan({ cls: "fkms-knowledge-graph-header-icon" });
@@ -1477,7 +1488,7 @@ export class AuxBrainView extends ItemView {
       return left.name.localeCompare(right.name, "zh-CN");
     });
     for (const node of orderedNodes) {
-      const selectionId = `${paperTitle}::${node.id}`;
+      const selectionId = `${graphKey}::${node.id}`;
       const button = stage.createEl("button", {
         cls: `fkms-knowledge-graph-node is-${node.entityType}`,
         attr: {
@@ -1520,7 +1531,7 @@ export class AuxBrainView extends ItemView {
     this.knowledgeGraphObservers.push(observer);
 
     const selectedNode = orderedNodes.find(
-      (node) => this.selectedKnowledgeNodeId === `${paperTitle}::${node.id}`
+      (node) => this.selectedKnowledgeNodeId === `${graphKey}::${node.id}`
     );
     if (selectedNode) this.renderKnowledgeNodeDetail(section, selectedNode);
   }
@@ -1658,7 +1669,7 @@ export class AuxBrainView extends ItemView {
     paperTitle: string
   ): string {
     return relation.subject_type === "paper"
-      ? `paper:${paperTitle}`
+      ? `paper:${relation.paper_id || relation.source_uri || paperTitle}`
       : `entity:${relation.subject_id || relation.subject_name}`;
   }
 
@@ -1678,18 +1689,75 @@ export class AuxBrainView extends ItemView {
     return icons[entityType] ?? "circle-dot";
   }
 
+  private library(): PaperLibraryView {
+    const settings = this.host.getSettings();
+    const url = settings.dossierUrl?.trim() || settings.bridgeUrl;
+    if (!this.paperLibrary || this.paperLibraryUrl !== url) {
+      this.paperLibrary?.dispose();
+      this.paperLibraryUrl = url;
+      const client = new PaperLibraryClient(url);
+      this.paperLibrary = new PaperLibraryView(client, {
+        reviewer: () => this.host.getSettings().reviewer,
+        canReview: () => !this.isWorkflowBusy(),
+        reviewSession: active => {
+          this.cardReviewActive = active;
+          this.render();
+          if (!active && !this.closed) queueMicrotask(() => { if (!this.cardReviewActive && !this.closed) this.host.onWorkflowIdle(); });
+        },
+        back: () => {
+          this.showKnowledgeBase = false;
+          this.paperLibrary?.dispose();
+          this.paperLibrary = null;
+          this.render();
+        },
+        legacyGraph: paper => {
+          this.knowledgeScope = paper ?? null;
+          this.knowledgeReader = paper ? () => client.graph(paper) : () => this.host.client().personalKnowledge(200);
+          this.knowledge = null; this.knowledgeError = ""; this.selectedKnowledgeNodeId = null;
+          this.showLegacyKnowledge = true;
+          this.render();
+          void this.loadPersonalKnowledge();
+        },
+        evidence: async (paper, source) => {
+          if (!source.source_path || (source.locator.kind !== "pdf" && source.locator.kind !== "markdown")) throw new Error("缺少本地文档或证据位置");
+          await verifyEvidenceSource(this.app, source);
+          await this.host.navigateToEvidence({
+            text: source.text, title: paper.title, sourcePath: source.source_path, sourceType: source.locator.kind
+          }, {
+            evidence_id: source.evidence_id, text: source.text, locator: source.locator,
+            location_label: source.location_label, rank: 1, score: 0, cited: true
+          });
+        },
+        bindEvidence: async (_paper, source) => {
+          if (!source.source_paper_id) throw new Error("缺少论文原文标识");
+          const { draft, fileHash } = await prepareEvidenceBinding(this.app, source);
+          await client.bindLocations(source.source_paper_id, draft, fileHash);
+        },
+        notify: message => { new Notice(message, 7000); }
+      });
+    }
+    return this.paperLibrary;
+  }
+
   private async loadPersonalKnowledge(): Promise<void> {
-    if (this.knowledgeLoading) return;
+    if (!this.showLegacyKnowledge) {
+      const request = this.library().refresh();
+      this.render();
+      await request;
+      return;
+    }
+    const requestId = ++this.knowledgeRequestId;
     this.knowledgeLoading = true;
+    this.knowledge = null;
     this.knowledgeError = "";
     this.render();
     try {
-      this.knowledge = await this.host.client().personalKnowledge(200);
+      const knowledge = await (this.knowledgeReader ? this.knowledgeReader() : this.host.client().personalKnowledge(200));
+      if (!this.closed && requestId === this.knowledgeRequestId && this.showLegacyKnowledge) this.knowledge = knowledge;
     } catch (error) {
-      this.knowledgeError = `个人知识库读取失败：${friendlyError(error)}`;
+      if (!this.closed && requestId === this.knowledgeRequestId) this.knowledgeError = `个人知识库读取失败：${friendlyError(error)}`;
     } finally {
-      this.knowledgeLoading = false;
-      this.render();
+      if (!this.closed && requestId === this.knowledgeRequestId) { this.knowledgeLoading = false; this.render(); }
     }
   }
 
@@ -1718,14 +1786,14 @@ export class AuxBrainView extends ItemView {
         const download = panel.createEl("a", {
           cls: "fkms-companion-download",
           attr: {
-            href: "https://github.com/asjmasjm/auxbrain/releases/tag/0.9.1",
+            href: "https://github.com/asjmasjm/auxbrain/releases",
             target: "_blank",
             rel: "noopener"
           }
         });
         const downloadIcon = download.createSpan({ cls: "fkms-button-icon" });
         setIcon(downloadIcon, "download");
-        download.createSpan({ text: "下载 Companion 0.9.1" });
+        download.createSpan({ text: "下载 Companion（建议 0.12.2+）" });
         panel.createDiv({
           cls: "fkms-companion-warning",
           text: "未签名 Beta 可能触发 Windows SmartScreen。请仅从官方 Release 下载并核对 SHA-256。"
@@ -1850,7 +1918,7 @@ export class AuxBrainView extends ItemView {
     item.toggleClass("is-estimated", estimated);
     item.createSpan({
       cls: "fkms-token-label",
-      text: estimated ? "Token 实时估算" : "Token 消耗"
+      text: estimated ? "令牌用量估算" : "令牌用量"
     });
     item.createSpan({
       cls: "fkms-token-total",
